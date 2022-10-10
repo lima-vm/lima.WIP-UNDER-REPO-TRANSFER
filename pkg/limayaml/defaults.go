@@ -14,6 +14,7 @@ import (
 
 	"github.com/lima-vm/lima/pkg/guestagent/api"
 	"github.com/lima-vm/lima/pkg/osutil"
+	"github.com/lima-vm/lima/pkg/reflectutil"
 	"github.com/lima-vm/lima/pkg/store/dirnames"
 	"github.com/lima-vm/lima/pkg/store/filenames"
 	"github.com/sirupsen/logrus"
@@ -61,6 +62,54 @@ func MACAddress(uniqueID string) string {
 	return hw.String()
 }
 
+// builtinDefault defines the built-in default values.
+var builtinDefault = &LimaYAML{
+	Arch:      nil, // Resolved in FillDefault()
+	Images:    nil,
+	CPUType:   defaultCPUType(),
+	CPUs:      pointer.Int(4),
+	Memory:    pointer.String("4GiB"),
+	Disk:      pointer.String("100GiB"),
+	Mounts:    nil,
+	MountType: pointer.String(REVSSHFS),
+	Video: Video{
+		Display: pointer.String("none"),
+	},
+	Firmware: Firmware{
+		LegacyBIOS: pointer.Bool(false),
+	},
+	SSH: SSH{
+		LocalPort:         pointer.Int(0), // Resolved by the hostagent
+		LoadDotSSHPubKeys: pointer.Bool(true),
+		ForwardAgent:      pointer.Bool(false),
+		ForwardX11:        pointer.Bool(false),
+		ForwardX11Trusted: pointer.Bool(false),
+	},
+	Provision: nil,
+	Containerd: Containerd{
+		System:   pointer.Bool(false),
+		User:     pointer.Bool(true),
+		Archives: defaultContainerdArchives(),
+	},
+	Probes:       nil,
+	PortForwards: nil,
+	Message:      "",
+	Networks:     nil,
+	Env:          nil,
+	DNS:          nil,
+	HostResolver: HostResolver{
+		Enabled: pointer.Bool(true),
+		IPv6:    pointer.Bool(false),
+		Hosts:   nil,
+	},
+	PropagateProxyEnv: pointer.Bool(true),
+	CACertificates: CACertificates{
+		RemoveDefaults: pointer.Bool(false),
+		Files:          nil,
+		Certs:          nil,
+	},
+}
+
 // FillDefault updates undefined fields in y with defaults from d (or built-in default), and overwrites with values from o.
 // Both d and o may be empty.
 //
@@ -76,284 +125,100 @@ func MACAddress(uniqueID string) string {
 //   - DNS are picked from the highest priority where DNS is not empty.
 //   - CACertificates Files and Certs are uniquely appended in d, y, o order
 func FillDefault(y, d, o *LimaYAML, filePath string) {
-	if y.Arch == nil {
-		y.Arch = d.Arch
-	}
-	if o.Arch != nil {
-		y.Arch = o.Arch
-	}
-	y.Arch = pointer.String(ResolveArch(y.Arch))
+	bd := builtinDefault
 
-	y.Images = append(append(o.Images, y.Images...), d.Images...)
-	for i := range y.Images {
-		img := &y.Images[i]
-		if img.Arch == "" {
-			img.Arch = *y.Arch
-		}
-		if img.Kernel != nil && img.Kernel.Arch == "" {
-			img.Kernel.Arch = img.Arch
-		}
-		if img.Initrd != nil && img.Initrd.Arch == "" {
-			img.Initrd.Arch = img.Arch
-		}
+	// *EXCEPTION*: Remove built-in containerd archives when the custom values are specified.
+	if len(d.Containerd.Archives)+len(y.Containerd.Archives)+len(o.Containerd.Archives) > 0 {
+		bd.Containerd.Archives = nil
 	}
 
-	cpuType := map[Arch]string{
-		AARCH64: "cortex-a72",
-		// Since https://github.com/lima-vm/lima/pull/494, we use qemu64 cpu for better emulation of x86_64.
-		X8664:   "qemu64",
-		RISCV64: "rv64", // FIXME: what is the right choice for riscv64?
+	// Merge bd, d, y, and o, into x.
+	// y is not altered yet, and is used later for exceptional rules.
+	xx, err := reflectutil.MergeMany(bd, d, y, o)
+	if err != nil {
+		panic(err)
 	}
-	for arch := range cpuType {
-		if IsNativeArch(arch) && IsAccelOS() {
-			if HasHostCPU() {
-				cpuType[arch] = "host"
-			} else if HasMaxCPU() {
-				cpuType[arch] = "max"
+	x := xx.(*LimaYAML)
+
+	// *EXCEPTION*: Mounts are appended in d, y, o order, but "merged" when the Location matches a previous entry;
+	//  the highest priority Writable setting wins.
+
+	// Combine all mounts; highest priority entry determines writable status.
+	// Only works for exact matches; does not normalize case or resolve symlinks.
+	mounts := make([]Mount, 0, len(d.Mounts)+len(y.Mounts)+len(o.Mounts))
+	location := make(map[string]int)
+	for _, mount := range append(append(d.Mounts, y.Mounts...), o.Mounts...) {
+		if i, ok := location[mount.Location]; ok {
+			if mount.SSHFS.Cache != nil {
+				mounts[i].SSHFS.Cache = mount.SSHFS.Cache
+			}
+			if mount.SSHFS.FollowSymlinks != nil {
+				mounts[i].SSHFS.FollowSymlinks = mount.SSHFS.FollowSymlinks
+			}
+			if mount.SSHFS.SFTPDriver != nil {
+				mounts[i].SSHFS.SFTPDriver = mount.SSHFS.SFTPDriver
+			}
+			if mount.NineP.SecurityModel != nil {
+				mounts[i].NineP.SecurityModel = mount.NineP.SecurityModel
+			}
+			if mount.NineP.ProtocolVersion != nil {
+				mounts[i].NineP.ProtocolVersion = mount.NineP.ProtocolVersion
+			}
+			if mount.NineP.Msize != nil {
+				mounts[i].NineP.Msize = mount.NineP.Msize
+			}
+			if mount.NineP.Cache != nil {
+				mounts[i].NineP.Cache = mount.NineP.Cache
+			}
+			if mount.Writable != nil {
+				mounts[i].Writable = mount.Writable
+			}
+			if mount.MountPoint != "" {
+				mounts[i].MountPoint = mount.MountPoint
+			}
+		} else {
+			location[mount.Location] = len(mounts)
+			mounts = append(mounts, mount)
+		}
+	}
+	x.Mounts = mounts
+
+	for i := range x.Mounts {
+		mount := &x.Mounts[i]
+		if mount.SSHFS.Cache == nil {
+			mount.SSHFS.Cache = pointer.Bool(true)
+		}
+		if mount.SSHFS.FollowSymlinks == nil {
+			mount.SSHFS.FollowSymlinks = pointer.Bool(false)
+		}
+		if mount.SSHFS.SFTPDriver == nil {
+			mount.SSHFS.SFTPDriver = pointer.String("")
+		}
+		if mount.NineP.SecurityModel == nil {
+			mounts[i].NineP.SecurityModel = pointer.String(Default9pSecurityModel)
+		}
+		if mount.NineP.ProtocolVersion == nil {
+			mounts[i].NineP.ProtocolVersion = pointer.String(Default9pProtocolVersion)
+		}
+		if mount.NineP.Msize == nil {
+			mounts[i].NineP.Msize = pointer.String(Default9pMsize)
+		}
+		if mount.Writable == nil {
+			mount.Writable = pointer.Bool(false)
+		}
+		if mount.NineP.Cache == nil {
+			if *mount.Writable {
+				mounts[i].NineP.Cache = pointer.String(Default9pCacheForRW)
+			} else {
+				mounts[i].NineP.Cache = pointer.String(Default9pCacheForRO)
 			}
 		}
-	}
-	for k, v := range d.CPUType {
-		if len(v) > 0 {
-			cpuType[k] = v
-		}
-	}
-	for k, v := range y.CPUType {
-		if len(v) > 0 {
-			cpuType[k] = v
-		}
-	}
-	for k, v := range o.CPUType {
-		if len(v) > 0 {
-			cpuType[k] = v
-		}
-	}
-	y.CPUType = cpuType
-
-	if y.CPUs == nil {
-		y.CPUs = d.CPUs
-	}
-	if o.CPUs != nil {
-		y.CPUs = o.CPUs
-	}
-	if y.CPUs == nil || *y.CPUs == 0 {
-		y.CPUs = pointer.Int(4)
-	}
-
-	if y.Memory == nil {
-		y.Memory = d.Memory
-	}
-	if o.Memory != nil {
-		y.Memory = o.Memory
-	}
-	if y.Memory == nil || *y.Memory == "" {
-		y.Memory = pointer.String("4GiB")
-	}
-
-	if y.Disk == nil {
-		y.Disk = d.Disk
-	}
-	if o.Disk != nil {
-		y.Disk = o.Disk
-	}
-	if y.Disk == nil || *y.Disk == "" {
-		y.Disk = pointer.String("100GiB")
-	}
-
-	if y.Video.Display == nil {
-		y.Video.Display = d.Video.Display
-	}
-	if o.Video.Display != nil {
-		y.Video.Display = o.Video.Display
-	}
-	if y.Video.Display == nil || *y.Video.Display == "" {
-		y.Video.Display = pointer.String("none")
-	}
-
-	if y.Firmware.LegacyBIOS == nil {
-		y.Firmware.LegacyBIOS = d.Firmware.LegacyBIOS
-	}
-	if o.Firmware.LegacyBIOS != nil {
-		y.Firmware.LegacyBIOS = o.Firmware.LegacyBIOS
-	}
-	if y.Firmware.LegacyBIOS == nil {
-		y.Firmware.LegacyBIOS = pointer.Bool(false)
-	}
-
-	if y.SSH.LocalPort == nil {
-		y.SSH.LocalPort = d.SSH.LocalPort
-	}
-	if o.SSH.LocalPort != nil {
-		y.SSH.LocalPort = o.SSH.LocalPort
-	}
-	if y.SSH.LocalPort == nil {
-		// y.SSH.LocalPort value is not filled here (filled by the hostagent)
-		y.SSH.LocalPort = pointer.Int(0)
-	}
-	if y.SSH.LoadDotSSHPubKeys == nil {
-		y.SSH.LoadDotSSHPubKeys = d.SSH.LoadDotSSHPubKeys
-	}
-	if o.SSH.LoadDotSSHPubKeys != nil {
-		y.SSH.LoadDotSSHPubKeys = o.SSH.LoadDotSSHPubKeys
-	}
-	if y.SSH.LoadDotSSHPubKeys == nil {
-		y.SSH.LoadDotSSHPubKeys = pointer.Bool(true)
-	}
-
-	if y.SSH.ForwardAgent == nil {
-		y.SSH.ForwardAgent = d.SSH.ForwardAgent
-	}
-	if o.SSH.ForwardAgent != nil {
-		y.SSH.ForwardAgent = o.SSH.ForwardAgent
-	}
-	if y.SSH.ForwardAgent == nil {
-		y.SSH.ForwardAgent = pointer.Bool(false)
-	}
-
-	if y.SSH.ForwardX11 == nil {
-		y.SSH.ForwardX11 = d.SSH.ForwardX11
-	}
-	if o.SSH.ForwardX11 != nil {
-		y.SSH.ForwardX11 = o.SSH.ForwardX11
-	}
-	if y.SSH.ForwardX11 == nil {
-		y.SSH.ForwardX11 = pointer.Bool(false)
-	}
-
-	if y.SSH.ForwardX11Trusted == nil {
-		y.SSH.ForwardX11Trusted = d.SSH.ForwardX11Trusted
-	}
-	if o.SSH.ForwardX11Trusted != nil {
-		y.SSH.ForwardX11Trusted = o.SSH.ForwardX11Trusted
-	}
-	if y.SSH.ForwardX11Trusted == nil {
-		y.SSH.ForwardX11Trusted = pointer.Bool(false)
-	}
-
-	hosts := make(map[string]string)
-	// Values can be either names or IP addresses. Name values are canonicalized in the hostResolver.
-	for k, v := range d.HostResolver.Hosts {
-		hosts[Cname(k)] = v
-	}
-	for k, v := range y.HostResolver.Hosts {
-		hosts[Cname(k)] = v
-	}
-	for k, v := range o.HostResolver.Hosts {
-		hosts[Cname(k)] = v
-	}
-	y.HostResolver.Hosts = hosts
-
-	y.Provision = append(append(o.Provision, y.Provision...), d.Provision...)
-	for i := range y.Provision {
-		provision := &y.Provision[i]
-		if provision.Mode == "" {
-			provision.Mode = ProvisionModeSystem
+		if mount.MountPoint == "" {
+			mounts[i].MountPoint = mount.Location
 		}
 	}
 
-	if y.Containerd.System == nil {
-		y.Containerd.System = d.Containerd.System
-	}
-	if o.Containerd.System != nil {
-		y.Containerd.System = o.Containerd.System
-	}
-	if y.Containerd.System == nil {
-		y.Containerd.System = pointer.Bool(false)
-	}
-	if y.Containerd.User == nil {
-		y.Containerd.User = d.Containerd.User
-	}
-	if o.Containerd.User != nil {
-		y.Containerd.User = o.Containerd.User
-	}
-	if y.Containerd.User == nil {
-		y.Containerd.User = pointer.Bool(true)
-	}
-
-	y.Containerd.Archives = append(append(o.Containerd.Archives, y.Containerd.Archives...), d.Containerd.Archives...)
-	if len(y.Containerd.Archives) == 0 {
-		y.Containerd.Archives = defaultContainerdArchives()
-	}
-	for i := range y.Containerd.Archives {
-		f := &y.Containerd.Archives[i]
-		if f.Arch == "" {
-			f.Arch = *y.Arch
-		}
-	}
-
-	y.Probes = append(append(o.Probes, y.Probes...), d.Probes...)
-	for i := range y.Probes {
-		probe := &y.Probes[i]
-		if probe.Mode == "" {
-			probe.Mode = ProbeModeReadiness
-		}
-		if probe.Description == "" {
-			probe.Description = fmt.Sprintf("user probe %d/%d", i+1, len(y.Probes))
-		}
-	}
-
-	y.PortForwards = append(append(o.PortForwards, y.PortForwards...), d.PortForwards...)
-	instDir := filepath.Dir(filePath)
-	for i := range y.PortForwards {
-		FillPortForwardDefaults(&y.PortForwards[i], instDir)
-		// After defaults processing the singular HostPort and GuestPort values should not be used again.
-	}
-
-	// If both `useHostResolved` and `HostResolver.Enabled` are defined in the same config,
-	// then the deprecated `useHostResolved` setting is silently ignored.
-	if y.HostResolver.Enabled == nil {
-		y.HostResolver.Enabled = y.UseHostResolver
-	}
-	if d.HostResolver.Enabled == nil {
-		d.HostResolver.Enabled = d.UseHostResolver
-	}
-	if o.HostResolver.Enabled == nil {
-		o.HostResolver.Enabled = o.UseHostResolver
-	}
-
-	if y.HostResolver.Enabled == nil {
-		y.HostResolver.Enabled = d.HostResolver.Enabled
-	}
-	if o.HostResolver.Enabled != nil {
-		y.HostResolver.Enabled = o.HostResolver.Enabled
-	}
-	if y.HostResolver.Enabled == nil {
-		y.HostResolver.Enabled = pointer.Bool(true)
-	}
-
-	if y.HostResolver.IPv6 == nil {
-		y.HostResolver.IPv6 = d.HostResolver.IPv6
-	}
-	if o.HostResolver.IPv6 != nil {
-		y.HostResolver.IPv6 = o.HostResolver.IPv6
-	}
-	if y.HostResolver.IPv6 == nil {
-		y.HostResolver.IPv6 = pointer.Bool(false)
-	}
-
-	if y.PropagateProxyEnv == nil {
-		y.PropagateProxyEnv = d.PropagateProxyEnv
-	}
-	if o.PropagateProxyEnv != nil {
-		y.PropagateProxyEnv = o.PropagateProxyEnv
-	}
-	if y.PropagateProxyEnv == nil {
-		y.PropagateProxyEnv = pointer.Bool(true)
-	}
-
-	if len(y.Network.VDEDeprecated) > 0 && len(y.Networks) == 0 {
-		for _, vde := range y.Network.VDEDeprecated {
-			network := Network{
-				Interface:            vde.Name,
-				MACAddress:           vde.MACAddress,
-				SwitchPortDeprecated: vde.SwitchPort,
-				VNLDeprecated:        vde.VNL,
-			}
-			y.Networks = append(y.Networks, network)
-		}
-		y.Network.migrated = true
-	}
-
+	// *EXCEPTION*: Networks are appended in d, y, o order
 	networks := make([]Network, 0, len(d.Networks)+len(y.Networks)+len(o.Networks))
 	iface := make(map[string]int)
 	for _, nw := range append(append(d.Networks, y.Networks...), o.Networks...) {
@@ -402,9 +267,9 @@ func FillDefault(y, d, o *LimaYAML, filePath string) {
 			networks = append(networks, nw)
 		}
 	}
-	y.Networks = networks
-	for i := range y.Networks {
-		nw := &y.Networks[i]
+	x.Networks = networks
+	for i := range x.Networks {
+		nw := &x.Networks[i]
 		if nw.MACAddress == "" {
 			// every interface in every limayaml file must get its own unique MAC address
 			nw.MACAddress = MACAddress(fmt.Sprintf("%s#%d", filePath, i))
@@ -414,126 +279,83 @@ func FillDefault(y, d, o *LimaYAML, filePath string) {
 		}
 	}
 
-	// Combine all mounts; highest priority entry determines writable status.
-	// Only works for exact matches; does not normalize case or resolve symlinks.
-	mounts := make([]Mount, 0, len(d.Mounts)+len(y.Mounts)+len(o.Mounts))
-	location := make(map[string]int)
-	for _, mount := range append(append(d.Mounts, y.Mounts...), o.Mounts...) {
-		if i, ok := location[mount.Location]; ok {
-			if mount.SSHFS.Cache != nil {
-				mounts[i].SSHFS.Cache = mount.SSHFS.Cache
-			}
-			if mount.SSHFS.FollowSymlinks != nil {
-				mounts[i].SSHFS.FollowSymlinks = mount.SSHFS.FollowSymlinks
-			}
-			if mount.SSHFS.SFTPDriver != nil {
-				mounts[i].SSHFS.SFTPDriver = mount.SSHFS.SFTPDriver
-			}
-			if mount.NineP.SecurityModel != nil {
-				mounts[i].NineP.SecurityModel = mount.NineP.SecurityModel
-			}
-			if mount.NineP.ProtocolVersion != nil {
-				mounts[i].NineP.ProtocolVersion = mount.NineP.ProtocolVersion
-			}
-			if mount.NineP.Msize != nil {
-				mounts[i].NineP.Msize = mount.NineP.Msize
-			}
-			if mount.NineP.Cache != nil {
-				mounts[i].NineP.Cache = mount.NineP.Cache
-			}
-			if mount.Writable != nil {
-				mounts[i].Writable = mount.Writable
-			}
-			if mount.MountPoint != "" {
-				mounts[i].MountPoint = mount.MountPoint
-			}
-		} else {
-			location[mount.Location] = len(mounts)
-			mounts = append(mounts, mount)
-		}
-	}
-	y.Mounts = mounts
-
-	for i := range y.Mounts {
-		mount := &y.Mounts[i]
-		if mount.SSHFS.Cache == nil {
-			mount.SSHFS.Cache = pointer.Bool(true)
-		}
-		if mount.SSHFS.FollowSymlinks == nil {
-			mount.SSHFS.FollowSymlinks = pointer.Bool(false)
-		}
-		if mount.SSHFS.SFTPDriver == nil {
-			mount.SSHFS.SFTPDriver = pointer.String("")
-		}
-		if mount.NineP.SecurityModel == nil {
-			mounts[i].NineP.SecurityModel = pointer.String(Default9pSecurityModel)
-		}
-		if mount.NineP.ProtocolVersion == nil {
-			mounts[i].NineP.ProtocolVersion = pointer.String(Default9pProtocolVersion)
-		}
-		if mount.NineP.Msize == nil {
-			mounts[i].NineP.Msize = pointer.String(Default9pMsize)
-		}
-		if mount.Writable == nil {
-			mount.Writable = pointer.Bool(false)
-		}
-		if mount.NineP.Cache == nil {
-			if *mount.Writable {
-				mounts[i].NineP.Cache = pointer.String(Default9pCacheForRW)
-			} else {
-				mounts[i].NineP.Cache = pointer.String(Default9pCacheForRO)
-			}
-		}
-		if mount.MountPoint == "" {
-			mounts[i].MountPoint = mount.Location
-		}
-	}
-
-	if y.MountType == nil {
-		y.MountType = d.MountType
-	}
-	if o.MountType != nil {
-		y.MountType = o.MountType
-	}
-	if y.MountType == nil || *y.MountType == "" {
-		y.MountType = pointer.String(REVSSHFS)
-	}
-
+	// *EXCEPTION*: DNS are picked from the highest priority where DNS is not empty.
 	// Note: DNS lists are not combined; highest priority setting is picked
-	if len(y.DNS) == 0 {
-		y.DNS = d.DNS
+	dns := y.DNS
+	if len(dns) == 0 {
+		dns = d.DNS
 	}
 	if len(o.DNS) > 0 {
-		y.DNS = o.DNS
+		dns = o.DNS
+	}
+	x.DNS = dns
+
+	// *EXCEPTION*: CACertificates Files and Certs are uniquely appended in d, y, o order
+	x.CACertificates.Files = unique(append(append(d.CACertificates.Files, y.CACertificates.Files...), o.CACertificates.Files...))
+	x.CACertificates.Certs = unique(append(append(d.CACertificates.Certs, y.CACertificates.Certs...), o.CACertificates.Certs...))
+
+	// Fix up other fields
+	instDir := filepath.Dir(filePath)
+	fixUp(x, instDir)
+
+	// Return the result x as y
+	*y = *x
+}
+
+func fixUp(x *LimaYAML, instDir string) {
+	// Resolve the default arch
+	x.Arch = pointer.String(ResolveArch(x.Arch))
+	for i := range x.Images {
+		img := &x.Images[i]
+		if img.Arch == "" {
+			img.Arch = *x.Arch
+		}
+		if img.Kernel != nil && img.Kernel.Arch == "" {
+			img.Kernel.Arch = img.Arch
+		}
+		if img.Initrd != nil && img.Initrd.Arch == "" {
+			img.Initrd.Arch = img.Arch
+		}
+	}
+	for i := range x.Containerd.Archives {
+		f := &x.Containerd.Archives[i]
+		if f.Arch == "" {
+			f.Arch = *x.Arch
+		}
 	}
 
-	env := make(map[string]string)
-	for k, v := range d.Env {
-		env[k] = v
-	}
-	for k, v := range y.Env {
-		env[k] = v
-	}
-	for k, v := range o.Env {
-		env[k] = v
-	}
-	y.Env = env
-
-	if y.CACertificates.RemoveDefaults == nil {
-		y.CACertificates.RemoveDefaults = d.CACertificates.RemoveDefaults
-	}
-	if o.CACertificates.RemoveDefaults != nil {
-		y.CACertificates.RemoveDefaults = o.CACertificates.RemoveDefaults
-	}
-	if y.CACertificates.RemoveDefaults == nil {
-		y.CACertificates.RemoveDefaults = pointer.Bool(false)
+	// Resolve the default provision mode
+	for i := range x.Provision {
+		provision := &x.Provision[i]
+		if provision.Mode == "" {
+			provision.Mode = ProvisionModeSystem
+		}
 	}
 
-	caFiles := unique(append(append(d.CACertificates.Files, y.CACertificates.Files...), o.CACertificates.Files...))
-	y.CACertificates.Files = caFiles
+	// Resolve the default probe mode
+	for i := range x.Probes {
+		probe := &x.Probes[i]
+		if probe.Mode == "" {
+			probe.Mode = ProbeModeReadiness
+		}
+		if probe.Description == "" {
+			probe.Description = fmt.Sprintf("user probe %d/%d", i+1, len(x.Probes))
+		}
+	}
 
-	caCerts := unique(append(append(d.CACertificates.Certs, y.CACertificates.Certs...), o.CACertificates.Certs...))
-	y.CACertificates.Certs = caCerts
+	// Fill port forward defaults
+	for i := range x.PortForwards {
+		FillPortForwardDefaults(&x.PortForwards[i], instDir)
+		// After defaults processing the singular HostPort and GuestPort values should not be used again.
+	}
+
+	// Fix up the host resolver.
+	// Values can be either names or IP addresses. Name values are canonicalized in the hostResolver.
+	hosts := make(map[string]string)
+	for k, v := range x.HostResolver.Hosts {
+		hosts[Cname(k)] = v
+	}
+	x.HostResolver.Hosts = hosts
 }
 
 func FillPortForwardDefaults(rule *PortForward, instDir string) {
@@ -685,4 +507,23 @@ func unique(s []string) []string {
 		}
 	}
 	return list
+}
+
+func defaultCPUType() map[Arch]*string {
+	cpuType := map[Arch]*string{
+		AARCH64: pointer.String("cortex-a72"),
+		// Since https://github.com/lima-vm/lima/pull/494, we use qemu64 cpu for better emulation of x86_64.
+		X8664:   pointer.String("qemu64"),
+		RISCV64: pointer.String("rv64"),
+	}
+	for arch := range cpuType {
+		if IsNativeArch(arch) && IsAccelOS() {
+			if HasHostCPU() {
+				cpuType[arch] = pointer.String("host")
+			} else if HasMaxCPU() {
+				cpuType[arch] = pointer.String("max")
+			}
+		}
+	}
+	return cpuType
 }

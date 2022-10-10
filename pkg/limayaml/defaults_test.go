@@ -22,8 +22,6 @@ func TestFillDefault(t *testing.T) {
 	var d, y, o LimaYAML
 
 	opts := []cmp.Option{
-		// Ignore internal NetworkDeprecated.migrated field
-		cmpopts.IgnoreUnexported(NetworkDeprecated{}),
 		// Consider nil slices and empty slices to be identical
 		cmpopts.EquateEmpty(),
 	}
@@ -48,10 +46,10 @@ func TestFillDefault(t *testing.T) {
 	// Builtin default values
 	builtin := LimaYAML{
 		Arch: pointer.String(arch),
-		CPUType: map[Arch]string{
-			AARCH64: "cortex-a72",
-			X8664:   "qemu64",
-			RISCV64: "rv64",
+		CPUType: map[Arch]*string{
+			AARCH64: pointer.String("cortex-a72"),
+			X8664:   pointer.String("qemu64"),
+			RISCV64: pointer.String("rv64"),
 		},
 		CPUs:   pointer.Int(4),
 		Memory: pointer.String("4GiB"),
@@ -85,9 +83,9 @@ func TestFillDefault(t *testing.T) {
 	}
 	if IsAccelOS() {
 		if HasHostCPU() {
-			builtin.CPUType[arch] = "host"
+			builtin.CPUType[arch] = pointer.String("host")
 		} else if HasMaxCPU() {
-			builtin.CPUType[arch] = "max"
+			builtin.CPUType[arch] = pointer.String("max")
 		}
 	}
 
@@ -219,10 +217,10 @@ func TestFillDefault(t *testing.T) {
 	// Choose values that are different from the "builtin" defaults
 	d = LimaYAML{
 		Arch: pointer.String("unknown"),
-		CPUType: map[Arch]string{
-			AARCH64: "arm64",
-			X8664:   "amd64",
-			RISCV64: "riscv64",
+		CPUType: map[Arch]*string{
+			AARCH64: pointer.String("arm64"),
+			X8664:   pointer.String("amd64"),
+			RISCV64: pointer.String("riscv64"),
 		},
 		CPUs:   pointer.Int(7),
 		Memory: pointer.String("5GiB"),
@@ -363,10 +361,10 @@ func TestFillDefault(t *testing.T) {
 
 	o = LimaYAML{
 		Arch: pointer.String(arch),
-		CPUType: map[Arch]string{
-			AARCH64: "uber-arm",
-			X8664:   "pentium",
-			RISCV64: "sifive-u54",
+		CPUType: map[Arch]*string{
+			AARCH64: pointer.String("uber-arm"),
+			X8664:   pointer.String("pentium"),
+			RISCV64: pointer.String("sifive-u54"),
 		},
 		CPUs:   pointer.Int(12),
 		Memory: pointer.String("7GiB"),

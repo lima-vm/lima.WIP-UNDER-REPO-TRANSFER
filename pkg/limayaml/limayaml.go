@@ -7,30 +7,30 @@ import (
 )
 
 type LimaYAML struct {
-	Arch              *Arch             `yaml:"arch,omitempty" json:"arch,omitempty"`
-	Images            []Image           `yaml:"images" json:"images"` // REQUIRED
-	CPUType           map[Arch]string   `yaml:"cpuType,omitempty" json:"cpuType,omitempty"`
-	CPUs              *int              `yaml:"cpus,omitempty" json:"cpus,omitempty"`
-	Memory            *string           `yaml:"memory,omitempty" json:"memory,omitempty"` // go-units.RAMInBytes
-	Disk              *string           `yaml:"disk,omitempty" json:"disk,omitempty"`     // go-units.RAMInBytes
-	Mounts            []Mount           `yaml:"mounts,omitempty" json:"mounts,omitempty"`
-	MountType         *MountType        `yaml:"mountType,omitempty" json:"mountType,omitempty"`
-	SSH               SSH               `yaml:"ssh,omitempty" json:"ssh,omitempty"` // REQUIRED (FIXME)
-	Firmware          Firmware          `yaml:"firmware,omitempty" json:"firmware,omitempty"`
-	Video             Video             `yaml:"video,omitempty" json:"video,omitempty"`
-	Provision         []Provision       `yaml:"provision,omitempty" json:"provision,omitempty"`
-	Containerd        Containerd        `yaml:"containerd,omitempty" json:"containerd,omitempty"`
-	Probes            []Probe           `yaml:"probes,omitempty" json:"probes,omitempty"`
-	PortForwards      []PortForward     `yaml:"portForwards,omitempty" json:"portForwards,omitempty"`
-	Message           string            `yaml:"message,omitempty" json:"message,omitempty"`
-	Networks          []Network         `yaml:"networks,omitempty" json:"networks,omitempty"`
-	Network           NetworkDeprecated `yaml:"network,omitempty" json:"network,omitempty"` // DEPRECATED, use `networks` instead
-	Env               map[string]string `yaml:"env,omitempty" json:"env,omitempty"`
-	DNS               []net.IP          `yaml:"dns,omitempty" json:"dns,omitempty"`
-	HostResolver      HostResolver      `yaml:"hostResolver,omitempty" json:"hostResolver,omitempty"`
-	UseHostResolver   *bool             `yaml:"useHostResolver,omitempty" json:"useHostResolver,omitempty"` // DEPRECATED, use `HostResolver.Enabled` instead
-	PropagateProxyEnv *bool             `yaml:"propagateProxyEnv,omitempty" json:"propagateProxyEnv,omitempty"`
-	CACertificates    CACertificates    `yaml:"caCerts,omitempty" json:"caCerts,omitempty"`
+	Arch         *Arch            `yaml:"arch,omitempty" json:"arch,omitempty"`
+	Images       []Image          `yaml:"images" json:"images"` // REQUIRED
+	CPUType      map[Arch]*string `yaml:"cpuType,omitempty" json:"cpuType,omitempty"`
+	CPUs         *int             `yaml:"cpus,omitempty" json:"cpus,omitempty"`
+	Memory       *string          `yaml:"memory,omitempty" json:"memory,omitempty"` // go-units.RAMInBytes
+	Disk         *string          `yaml:"disk,omitempty" json:"disk,omitempty"`     // go-units.RAMInBytes
+	Mounts       []Mount          `yaml:"mounts,omitempty" json:"mounts,omitempty"`
+	MountType    *MountType       `yaml:"mountType,omitempty" json:"mountType,omitempty"`
+	SSH          SSH              `yaml:"ssh,omitempty" json:"ssh,omitempty"` // REQUIRED (FIXME)
+	Firmware     Firmware         `yaml:"firmware,omitempty" json:"firmware,omitempty"`
+	Video        Video            `yaml:"video,omitempty" json:"video,omitempty"`
+	Provision    []Provision      `yaml:"provision,omitempty" json:"provision,omitempty"`
+	Containerd   Containerd       `yaml:"containerd,omitempty" json:"containerd,omitempty"`
+	Probes       []Probe          `yaml:"probes,omitempty" json:"probes,omitempty"`
+	PortForwards []PortForward    `yaml:"portForwards,omitempty" json:"portForwards,omitempty"`
+	Message      string           `yaml:"message,omitempty" json:"message,omitempty"`
+	Networks     []Network        `yaml:"networks,omitempty" json:"networks,omitempty"`
+	// `network` was deprecated in Lima v0.7.0, removed in Lima v1.0.0. Use `networks` instead.
+	Env          map[string]string `yaml:"env,omitempty" json:"env,omitempty"`
+	DNS          []net.IP          `yaml:"dns,omitempty" json:"dns,omitempty"`
+	HostResolver HostResolver      `yaml:"hostResolver,omitempty" json:"hostResolver,omitempty"`
+	// `useHostResolver` was deprecated in Lima v0.8.1, removed in Lima v1.0.0. Use `hostResolver.enabled` instead.
+	PropagateProxyEnv *bool          `yaml:"propagateProxyEnv,omitempty" json:"propagateProxyEnv,omitempty"`
+	CACertificates    CACertificates `yaml:"caCerts,omitempty" json:"caCerts,omitempty"`
 }
 
 type Arch = string
@@ -193,12 +193,6 @@ type CACertificates struct {
 
 // Types have been renamed to turn all references to the old names into compiler errors,
 // and to avoid accidental usage in new code.
-
-type NetworkDeprecated struct {
-	VDEDeprecated []VDEDeprecated `yaml:"vde,omitempty" json:"vde,omitempty"`
-	// migrate will be true when `network.VDE` has been copied to `networks` by FillDefaults()
-	migrated bool
-}
 
 type VDEDeprecated struct {
 	VNL        string `yaml:"vnl,omitempty" json:"vnl,omitempty"`

@@ -78,7 +78,11 @@ func Inspect(instName string) (*Instance, error) {
 		return inst, nil
 	}
 	inst.Arch = *y.Arch
-	inst.CPUType = y.CPUType[*y.Arch]
+	cpuType, ok := y.CPUType[*y.Arch]
+	if !ok || cpuType == nil {
+		return nil, fmt.Errorf("no cpu type is defined for arch %q", *y.Arch)
+	}
+	inst.CPUType = *cpuType
 
 	inst.CPUs = *y.CPUs
 	memory, err := units.RAMInBytes(*y.Memory)

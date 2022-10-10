@@ -262,15 +262,6 @@ func Validate(y LimaYAML, warn bool) error {
 }
 
 func validateNetwork(y LimaYAML, warn bool) error {
-	if len(y.Network.VDEDeprecated) > 0 {
-		if y.Network.migrated {
-			if warn {
-				logrus.Warnf("field `network.VDE` is deprecated; please use `networks` instead")
-			}
-		} else {
-			return fmt.Errorf("you cannot use deprecated field `network.VDE` together with replacement field `networks`")
-		}
-	}
 	interfaceName := make(map[string]int)
 	for i, nw := range y.Networks {
 		field := fmt.Sprintf("networks[%d]", i)

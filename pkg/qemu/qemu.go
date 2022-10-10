@@ -365,11 +365,14 @@ func Cmdline(cfg Config) (string, []string, error) {
 	args = appendArgsIfNoConflict(args, "-m", strconv.Itoa(int(memBytes>>20)))
 
 	// CPU
-	cpu := y.CPUType[*y.Arch]
-	args = appendArgsIfNoConflict(args, "-cpu", cpu)
+	cpu, ok := y.CPUType[*y.Arch]
+	if !ok || cpu == nil {
+		return "", nil, fmt.Errorf("no cpu type is defined for arch %q", *y.Arch)
+	}
+	args = appendArgsIfNoConflict(args, "-cpu", *cpu)
 	switch *y.Arch {
 	case limayaml.X8664:
-		if strings.HasPrefix(cpu, "qemu64") && runtime.GOOS != "windows" {
+		if strings.HasPrefix(*cpu, "qemu64") && runtime.GOOS != "windows" {
 			// use q35 machine with vmware io port disabled.
 			args = appendArgsIfNoConflict(args, "-machine", "q35,vmport=off")
 			// use tcg accelerator with multi threading with 512MB translation block size
