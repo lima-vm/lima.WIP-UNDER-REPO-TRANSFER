@@ -1,7 +1,7 @@
 # Deploy kubernetes via kubeadm.
 # $ limactl start ./k8s.yaml
 # $ limactl shell k8s sudo kubectl
-
+#
 # It can be accessed from the host by exporting the kubeconfig file;
 # the ports are already forwarded automatically by lima:
 #
@@ -9,8 +9,11 @@
 # $ kubectl get no
 # NAME       STATUS   ROLES                  AGE   VERSION
 # lima-k8s   Ready    control-plane,master   44s   v1.22.3
-
+#
 # This example requires Lima v0.7.0 or later.
+# To be able to join worker nodes, an extra network needs to be set up.
+# The default network is only visible from the host, not other guests.
+
 images:
 # Try to use release-yyyyMMdd image if available. Note that release-yyyyMMdd will be removed after several months.
 - location: "https://cloud-images.ubuntu.com/releases/22.04/release-20230518/ubuntu-22.04-server-cloudimg-amd64.img"
@@ -28,9 +31,11 @@ images:
 
 # Mounts are disabled in this example, but can be enabled optionally.
 mounts: []
+
 containerd:
   system: true
   user: false
+
 provision:
 # See <https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/>
 - mode: system
@@ -94,6 +99,18 @@ provision:
   script: |
     #!/bin/bash
     set -eux -o pipefail
+    # To install a worker node, fill in and uncomment this line:
+    #export K8S_URL=https://lima-k8s:6443 K8S_TOKEN=xxx K8S_HASH=yyy
+    # To get the token/hash to use for the variables, run this command:
+    # $ limactl shell k8s sudo kubeadm token create --print-join-command
+    if [ -n "${K8S_TOKEN:-}" ]; then
+      # WORKER NODE
+      test -e /etc/kubernetes/kubelet.conf && exit 0
+      kubeadm join "${K8S_URL##https://}" --token "${K8S_TOKEN}" \
+             --discovery-token-ca-cert-hash "${K8S_HASH}"
+      exit 0
+    fi
+    # CONTROL PLANE NODE
     test -e /etc/kubernetes/admin.conf && exit 0
     export KUBECONFIG=/etc/kubernetes/admin.conf
     kubeadm config images list
@@ -124,6 +141,7 @@ provision:
     kubectl taint nodes --all node-role.kubernetes.io/control-plane-
     sed -e "s/${LIMA_CIDATA_SLIRP_IP_ADDRESS:-192.168.5.15}/127.0.0.1/" -i $KUBECONFIG
     mkdir -p ${HOME:-/root}/.kube && cp -f $KUBECONFIG ${HOME:-/root}/.kube/config
+
 probes:
 - description: "kubeadm to be installed"
   script: |

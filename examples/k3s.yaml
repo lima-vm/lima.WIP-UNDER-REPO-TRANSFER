@@ -11,6 +11,8 @@
 # lima-k3s   Ready    control-plane,master   69s   v1.21.1+k3s1
 #
 # This example requires Lima v0.7.0 or later.
+# To be able to join worker nodes, an extra network needs to be set up.
+# The default network is only visible from the host, not other guests.
 
 images:
 # Try to use release-yyyyMMdd image if available. Note that release-yyyyMMdd will be removed after several months.
@@ -39,6 +41,10 @@ provision:
 - mode: system
   script: |
     #!/bin/sh
+    # To install a worker node, fill in and uncomment this line:
+    #export K3S_URL=https://lima-k3s:6443 K3S_TOKEN=xxx
+    # To get the token to use for the variable, run this command:
+    # $ limactl shell k3s sudo cat /var/lib/rancher/k3s/server/node-token
     curl -sfL https://get.k3s.io | sh -
 
 probes:
