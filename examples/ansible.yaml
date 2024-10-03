@@ -22,3 +22,11 @@ mounts:
 provision:
 - mode: ansible
   playbook: ./templates/ansible/playbook.yaml
+message: |
+  To run `ansible` on the host (assumes ansible is installed), run the following commands:
+  ------
+  export ANSIBLE_INVENTORY="{{.Dir}}/ansible-inventory.yaml"
+  # To see the inventory: `ansible-inventory --list --yaml`
+
+  ansible all -m ping
+  ------
