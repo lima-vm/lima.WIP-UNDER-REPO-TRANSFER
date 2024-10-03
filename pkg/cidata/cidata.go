@@ -311,7 +311,10 @@ func GenerateISO9660(instDir, name string, instConfig *limayaml.LimaYAML, udpDNS
 		args.CACerts.Trusted = append(args.CACerts.Trusted, cert)
 	}
 
-	args.BootCmds = getBootCmds(instConfig.Provision)
+	args.BootCmds, err = getBootCmds(instConfig.Provision)
+	if err != nil {
+		return err
+	}
 
 	for _, f := range instConfig.Provision {
 		if f.Mode == limayaml.ProvisionModeDependency && *f.SkipDefaultDependencyResolution {
@@ -329,11 +332,19 @@ func GenerateISO9660(instDir, name string, instConfig *limayaml.LimaYAML, udpDNS
 	}
 
 	for i, f := range instConfig.Provision {
+		script := f.Script
+		if f.Path != "" {
+			b, err := os.ReadFile(f.Path)
+			if err != nil {
+				return err
+			}
+			script = string(b)
+		}
 		switch f.Mode {
 		case limayaml.ProvisionModeSystem, limayaml.ProvisionModeUser, limayaml.ProvisionModeDependency:
 			layout = append(layout, iso9660util.Entry{
 				Path:   fmt.Sprintf("provision.%s/%08d", f.Mode, i),
-				Reader: strings.NewReader(f.Script),
+				Reader: strings.NewReader(script),
 			})
 		case limayaml.ProvisionModeBoot:
 			continue
@@ -406,21 +417,30 @@ func getCert(content string) Cert {
 	return Cert{Lines: lines}
 }
 
-func getBootCmds(p []limayaml.Provision) []BootCmds {
+func getBootCmds(p []limayaml.Provision) ([]BootCmds, error) {
 	var bootCmds []BootCmds
 	for _, f := range p {
-		if f.Mode == limayaml.ProvisionModeBoot {
-			lines := []string{}
-			for _, line := range strings.Split(f.Script, "\n") {
-				if line == "" {
-					continue
-				}
-				lines = append(lines, strings.TrimSpace(line))
-			}
-			bootCmds = append(bootCmds, BootCmds{Lines: lines})
+		if f.Mode != limayaml.ProvisionModeBoot {
+			continue
 		}
+		script := f.Script
+		if f.Path != "" {
+			b, err := os.ReadFile(f.Path)
+			if err != nil {
+				return nil, err
+			}
+			script = string(b)
+		}
+		lines := []string{}
+		for _, line := range strings.Split(script, "\n") {
+			if line == "" {
+				continue
+			}
+			lines = append(lines, strings.TrimSpace(line))
+		}
+		bootCmds = append(bootCmds, BootCmds{Lines: lines})
 	}
-	return bootCmds
+	return bootCmds, nil
 }
 
 func diskDeviceNameFromOrder(order int) string {

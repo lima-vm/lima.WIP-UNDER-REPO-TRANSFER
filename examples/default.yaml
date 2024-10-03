@@ -208,6 +208,7 @@ containerd:
 # Provisioning scripts need to be idempotent because they might be called
 # multiple times, e.g. when the host VM is being restarted.
 # The scripts can use the following template variables: {{.Home}}, {{.UID}}, {{.User}}, and {{.Param.Key}}
+# They can be provided inline (as field `script`), or in external files (as field `path`).
 # 🟢 Builtin default: null
 # provision:
 # # `system` is executed with root privileges
@@ -251,6 +252,7 @@ containerd:
 # Probe scripts to check readiness.
 # The scripts run in user mode. They must start with a '#!' line.
 # The scripts can use the following template variables: {{.Home}}, {{.UID}}, {{.User}}, and {{.Param.Key}}
+# They can be provided inline (as field `script`), or in external files (as field `path`).
 # 🟢 Builtin default: null
 # probes:
 # # Only `readiness` probes are supported right now.

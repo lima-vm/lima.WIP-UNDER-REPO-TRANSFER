@@ -208,6 +208,14 @@ func Validate(y *LimaYAML, warn bool) error {
 			return fmt.Errorf("field `provision[%d].mode` must one of %q, %q, %q, %q, or %q",
 				i, ProvisionModeSystem, ProvisionModeUser, ProvisionModeBoot, ProvisionModeDependency, ProvisionModeAnsible)
 		}
+		if p.Path != "" {
+			if p.Script != "" {
+				return fmt.Errorf("field `provision[%d].script must be empty if path is set", i)
+			}
+			if _, err := os.Stat(p.Path); err != nil {
+				return fmt.Errorf("field `provision[%d].path` refers to an inaccessible path: %q: %w", i, p.Path, err)
+			}
+		}
 		if strings.Contains(p.Script, "LIMA_CIDATA") {
 			logrus.Warn("provisioning scripts should not reference the LIMA_CIDATA variables")
 		}
@@ -231,6 +239,14 @@ func Validate(y *LimaYAML, warn bool) error {
 		case ProbeModeReadiness:
 		default:
 			return fmt.Errorf("field `probe[%d].mode` can only be %q", i, ProbeModeReadiness)
+		}
+		if p.Path != "" {
+			if p.Script != "" {
+				return fmt.Errorf("field `probe[%d].script must be empty if path is set", i)
+			}
+			if _, err := os.Stat(p.Path); err != nil {
+				return fmt.Errorf("field `probe[%d].path` refers to an inaccessible path: %q: %w", i, p.Path, err)
+			}
 		}
 	}
 	for i, rule := range y.PortForwards {

@@ -198,6 +198,7 @@ type Provision struct {
 	Mode                            ProvisionMode `yaml:"mode" json:"mode"` // default: "system"
 	SkipDefaultDependencyResolution *bool         `yaml:"skipDefaultDependencyResolution,omitempty" json:"skipDefaultDependencyResolution,omitempty"`
 	Script                          string        `yaml:"script" json:"script"`
+	Path                            string        `yaml:"path,omitempty" json:"path,omitempty"`
 	Playbook                        string        `yaml:"playbook,omitempty" json:"playbook,omitempty"`
 }
 
@@ -217,6 +218,7 @@ type Probe struct {
 	Mode        ProbeMode // default: "readiness"
 	Description string
 	Script      string
+	Path        string `yaml:",omitempty" json:",omitempty"`
 	Hint        string
 }
 

@@ -3,6 +3,7 @@ package hostagent
 import (
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/lima-vm/lima/pkg/limayaml"
@@ -201,10 +202,19 @@ Also see "/var/log/cloud-init-output.log" in the guest.
 			})
 	}
 	for _, probe := range a.instConfig.Probes {
+		script := probe.Script
+		if probe.Path != "" {
+			b, err := os.ReadFile(probe.Path)
+			if err != nil {
+				logrus.WithError(err).Errorf("failed to read script %q", probe.Path)
+				continue
+			}
+			script = string(b)
+		}
 		if probe.Mode == limayaml.ProbeModeReadiness {
 			req = append(req, requirement{
 				description: probe.Description,
-				script:      probe.Script,
+				script:      script,
 				debugHint:   probe.Hint,
 			})
 		}
