@@ -88,6 +88,19 @@ func defaultContainerdArchives() []File {
 	return containerd.Archives
 }
 
+func defaultMounts() []Mount {
+	return []Mount{
+		{
+			Location: "~",
+			Writable: ptr.Of(false),
+		},
+		{
+			Location: "/tmp/lima",
+			Writable: ptr.Of(true),
+		},
+	}
+}
+
 // FirstUsernetIndex gets the index of first usernet network under l.Network[]. Returns -1 if no usernet network found.
 func FirstUsernetIndex(l *LimaYAML) int {
 	return slices.IndexFunc(l.Networks, func(network Network) bool { return networks.IsUsernet(network.Lima) })
@@ -155,6 +168,8 @@ func defaultGuestInstallPrefix() string {
 	return "/usr/local"
 }
 
+var ReadImage func(name string) ([]byte, error)
+
 // FillDefault updates undefined fields in y with defaults from d (or built-in default), and overwrites with values from o.
 // Both d and o may be empty.
 //
@@ -194,6 +209,26 @@ func FillDefault(y, d, o *LimaYAML, filePath string) {
 	y.Arch = ptr.Of(ResolveArch(y.Arch))
 
 	y.Images = append(append(o.Images, y.Images...), d.Images...)
+	images := []Image{}
+	for i := range y.Images {
+		img := &y.Images[i]
+		if img.Name != "" && ReadImage != nil {
+			ib, err := ReadImage(img.Name)
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+			iy, err := LoadImage(ib, img.Name)
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+			images = append(images, iy.Images...)
+		} else {
+			images = append(images, *img)
+		}
+	}
+	y.Images = images
 	for i := range y.Images {
 		img := &y.Images[i]
 		if img.Arch == "" {
@@ -622,6 +657,16 @@ func FillDefault(y, d, o *LimaYAML, filePath string) {
 			location[mount.Location] = len(mounts)
 			mounts = append(mounts, mount)
 		}
+	}
+	y.Mounts = mounts
+
+	mounts = []Mount{}
+	for _, mount := range y.Mounts {
+		if mount.Name == "default" {
+			mounts = append(mounts, defaultMounts()...)
+			continue
+		}
+		mounts = append(mounts, mount)
 	}
 	y.Mounts = mounts
 

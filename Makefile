@@ -91,11 +91,14 @@ help-targets:
 	@echo  '- default_template          : Copy default.yaml template'
 	@echo  '- create-examples-link      : Create a symlink at ../examples pointing to templates'
 	@echo
+	@echo  'Targets for files in _output/share/lima/images/:'
+	@echo  '- images                    : Copy images'
+	@echo
 	@echo  'Targets for files in _output/share/doc/lima:'
 	@echo  '- documentation             : Copy documentation to _output/share/doc/lima'
 	@echo  '- create-links-in-doc-dir   : Create some symlinks pointing ../../lima/templates'
 	@echo
-	@echo  '# e.g. to install limactl, helpers, native guestagent, and templates:'
+	@echo  '# e.g. to install limactl, helpers, native guestagent, images and templates:'
 	@echo  '#   make native install'
 
 .PHONY: help-artifact
@@ -311,6 +314,19 @@ _output/share/lima/templates/%: examples/%
 # $(1): target file
 # On Windows, always copy to ensure the target has the same file as the source.
 force_link = $(if $(filter windows,$(GOOS)),force,$(shell test ! -L $(1) && echo force))
+
+################################################################################
+# _output/share/lima/images
+IMAGES = $(addprefix _output/share/lima/images/,$(notdir $(wildcard images/*)))
+
+.PHONY: images
+images: $(IMAGES)
+
+$(IMAGES): | _output/share/lima/images
+MKDIR_TARGETS += _output/share/lima/images
+
+_output/share/lima/images/%: images/%
+	cp -aL $< $@
 
 ################################################################################
 # _output/share/lima/examples

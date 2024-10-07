@@ -13,6 +13,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+func unmarshalMount(dst *Mount, b []byte) error {
+	var s string
+	if err := yaml.Unmarshal(b, &s); err == nil {
+		*dst = Mount{Name: s}
+		return nil
+	}
+	return yaml.Unmarshal(b, dst)
+}
+
 func unmarshalDisk(dst *Disk, b []byte) error {
 	var s string
 	if err := yaml.Unmarshal(b, &s); err == nil {
@@ -22,8 +31,23 @@ func unmarshalDisk(dst *Disk, b []byte) error {
 	return yaml.Unmarshal(b, dst)
 }
 
+func unmarshalImage(dst *Image, b []byte) error {
+	var s string
+	if err := yaml.Unmarshal(b, &s); err == nil {
+		*dst = Image{Name: s}
+		return nil
+	}
+	return yaml.Unmarshal(b, dst)
+}
+
+var customMarshalers = []yaml.DecodeOption{
+	yaml.CustomUnmarshaler[Mount](unmarshalMount),
+	yaml.CustomUnmarshaler[Disk](unmarshalDisk),
+	yaml.CustomUnmarshaler[Image](unmarshalImage),
+}
+
 func unmarshalYAML(data []byte, v interface{}, comment string) error {
-	if err := yaml.UnmarshalWithOptions(data, v, yaml.DisallowDuplicateKey(), yaml.CustomUnmarshaler[Disk](unmarshalDisk)); err != nil {
+	if err := yaml.UnmarshalWithOptions(data, v, append(customMarshalers, yaml.DisallowDuplicateKey())...); err != nil {
 		return fmt.Errorf("failed to unmarshal YAML (%s): %w", comment, err)
 	}
 	// the go-yaml library doesn't catch all markup errors, unfortunately
@@ -31,12 +55,21 @@ func unmarshalYAML(data []byte, v interface{}, comment string) error {
 	if err := yqutil.ValidateContent(data); err != nil {
 		return fmt.Errorf("failed to unmarshal YAML (%s): %w", comment, err)
 	}
-	if err := yaml.UnmarshalWithOptions(data, v, yaml.Strict(), yaml.CustomUnmarshaler[Disk](unmarshalDisk)); err != nil {
+	if err := yaml.UnmarshalWithOptions(data, v, append(customMarshalers, yaml.Strict())...); err != nil {
 		logrus.WithField("comment", comment).WithError(err).Warn("Non-strict YAML is deprecated and will be unsupported in a future version of Lima")
 		// Non-strict YAML is known to be used by Rancher Desktop:
 		// https://github.com/rancher-sandbox/rancher-desktop/blob/c7ea7508a0191634adf16f4675f64c73198e8d37/src/backend/lima.ts#L114-L117
 	}
 	return nil
+}
+
+// LoadImage loads the yaml.
+func LoadImage(b []byte, filePath string) (*ImageYAML, error) {
+	var y ImageYAML
+	if err := unmarshalYAML(b, &y, filePath); err != nil {
+		return nil, err
+	}
+	return &y, nil
 }
 
 // Load loads the yaml and fulfills unspecified fields with the default values.

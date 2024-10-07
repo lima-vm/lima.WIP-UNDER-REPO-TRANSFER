@@ -47,6 +47,10 @@ type LimaYAML struct {
 	TimeZone          *string        `yaml:"timezone,omitempty" json:"timezone,omitempty"`
 }
 
+type ImageYAML struct {
+	Images []Image `yaml:"images" json:"images"`
+}
+
 type (
 	OS        = string
 	Arch      = string
@@ -104,6 +108,7 @@ type Kernel struct {
 }
 
 type Image struct {
+	Name   string `yaml:"name,omitempty" json:"name,omitempty"`
 	File   `yaml:",inline"`
 	Kernel *Kernel `yaml:"kernel,omitempty" json:"kernel,omitempty"`
 	Initrd *File   `yaml:"initrd,omitempty" json:"initrd,omitempty"`
@@ -117,6 +122,7 @@ type Disk struct {
 }
 
 type Mount struct {
+	Name       string   `yaml:"name,omitempty" json:"name,omitempty"`
 	Location   string   `yaml:"location" json:"location"` // REQUIRED
 	MountPoint string   `yaml:"mountPoint,omitempty" json:"mountPoint,omitempty"`
 	Writable   *bool    `yaml:"writable,omitempty" json:"writable,omitempty"`

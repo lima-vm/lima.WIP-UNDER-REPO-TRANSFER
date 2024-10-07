@@ -1,6 +1,7 @@
 package limayaml
 
 import (
+	"fmt"
 	"os"
 	"runtime"
 	"testing"
@@ -17,6 +18,13 @@ func TestValidateEmpty(t *testing.T) {
 
 // Note: can't embed symbolic links, use "os"
 
+func readImage(name string) ([]byte, error) {
+	if name != "default" {
+		return nil, fmt.Errorf("unexpected image: %s", name)
+	}
+	return os.ReadFile("image.yaml")
+}
+
 func TestValidateDefault(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// FIXME: `assertion failed: error is not nil: field `mounts[1].location` must be an absolute path, got "/tmp/lima"`
@@ -25,6 +33,7 @@ func TestValidateDefault(t *testing.T) {
 
 	bytes, err := os.ReadFile("default.yaml")
 	assert.NilError(t, err)
+	ReadImage = readImage
 	y, err := Load(bytes, "default.yaml")
 	assert.NilError(t, err)
 	err = Validate(y, true)

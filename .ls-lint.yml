@@ -19,6 +19,10 @@ ls:
   docs:
     .md: kebab-case
 
+  images:
+    # valid names are `ubuntu-24.04` or `debian-12`
+    .yaml: regex:[a-z0-9-.]+
+
   website/content:
     .dir: lowercase
 

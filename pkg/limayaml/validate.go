@@ -91,6 +91,15 @@ func Validate(y *LimaYAML, warn bool) error {
 		return errors.New("field `images` must be set")
 	}
 	for i, f := range y.Images {
+		if f.Name != "" {
+			if ReadImage == nil {
+				return fmt.Errorf("limayaml.ReadImage is not set")
+			}
+			if _, err := ReadImage(f.Name); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := validateFileObject(f.File, fmt.Sprintf("images[%d]", i)); err != nil {
 			return err
 		}
@@ -144,6 +153,13 @@ func Validate(y *LimaYAML, warn bool) error {
 	reservedHome := fmt.Sprintf("/home/%s.linux", u.Username)
 
 	for i, f := range y.Mounts {
+		if f.Name != "" {
+			if f.Name != "default" {
+				return fmt.Errorf("field `mounts[%d].name` refers to an unknown name: %q",
+					i, f.Name)
+			}
+			continue
+		}
 		if !filepath.IsAbs(f.Location) && !strings.HasPrefix(f.Location, "~") {
 			return fmt.Errorf("field `mounts[%d].location` must be an absolute path, got %q",
 				i, f.Location)
