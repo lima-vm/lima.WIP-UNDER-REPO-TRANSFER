@@ -150,6 +150,8 @@ func newApp() *cobra.Command {
 		newDiskCommand(),
 		newUsernetCommand(),
 		newGenDocCommand(),
+		newResumeCommand(),
+		newSuspendCommand(),
 		newSnapshotCommand(),
 		newProtectCommand(),
 		newUnprotectCommand(),

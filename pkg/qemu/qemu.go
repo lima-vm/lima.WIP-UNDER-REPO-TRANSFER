@@ -185,6 +185,64 @@ func execImgCommand(cfg Config, args ...string) (string, error) {
 	return string(b), err
 }
 
+func Stop(cfg Config) error {
+	qmpClient, err := newQmpClient(cfg)
+	if err != nil {
+		return err
+	}
+	if err := qmpClient.Connect(); err != nil {
+		return err
+	}
+	defer func() { _ = qmpClient.Disconnect() }()
+	rawClient := raw.NewMonitor(qmpClient)
+	logrus.Info("Sending QMP stop command")
+	return rawClient.Stop()
+}
+
+func Cont(cfg Config) error {
+	qmpClient, err := newQmpClient(cfg)
+	if err != nil {
+		return err
+	}
+	if err := qmpClient.Connect(); err != nil {
+		return err
+	}
+	defer func() { _ = qmpClient.Disconnect() }()
+	rawClient := raw.NewMonitor(qmpClient)
+	logrus.Info("Sending QMP cont command")
+	return rawClient.Cont()
+}
+
+type StatusInfo struct {
+	raw.StatusInfo
+}
+
+func QueryStatus(cfg Config) (*StatusInfo, error) {
+	qmpClient, err := newQmpClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := qmpClient.Connect(); err != nil {
+		return nil, err
+	}
+	defer func() { _ = qmpClient.Disconnect() }()
+	rawClient := raw.NewMonitor(qmpClient)
+	logrus.Debug("Sending QMP query-status command")
+	status, err := rawClient.QueryStatus()
+	if err != nil {
+		return nil, err
+	}
+	return &StatusInfo{status}, nil
+}
+
+func IsPaused(info *StatusInfo) bool {
+	return info.Status == raw.RunStatePaused
+}
+
+func IsRunning(info *StatusInfo) bool {
+	return info.Status == raw.RunStateRunning
+}
+
 func Del(cfg Config, run bool, tag string) error {
 	if run {
 		out, err := sendHmpCommand(cfg, "delvm", tag)

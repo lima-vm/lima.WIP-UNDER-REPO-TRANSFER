@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/docker/go-units"
+	hostagentapi "github.com/lima-vm/lima/pkg/hostagent/api"
 	hostagentclient "github.com/lima-vm/lima/pkg/hostagent/api/client"
 	"github.com/lima-vm/lima/pkg/limayaml"
 	"github.com/lima-vm/lima/pkg/store/dirnames"
@@ -35,6 +36,7 @@ const (
 	StatusBroken        Status = "Broken"
 	StatusStopped       Status = "Stopped"
 	StatusRunning       Status = "Running"
+	StatusPaused        Status = "Paused"
 )
 
 type Instance struct {
@@ -185,10 +187,35 @@ func inspectStatusWithPIDFiles(instDir string, inst *Instance, y *limayaml.LimaY
 		inst.Errors = append(inst.Errors, err)
 	}
 
+	instStatus := StatusUnknown
+	if inst.HostAgentPID != 0 && inst.DriverPID != 0 {
+		haSock := filepath.Join(instDir, filenames.HostAgentSock)
+		haClient, err := hostagentclient.NewHostAgentClient(haSock)
+		if err != nil {
+			inst.Status = StatusBroken
+			inst.Errors = append(inst.Errors, fmt.Errorf("failed to connect to %q: %w", haSock, err))
+		} else {
+			ctx, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
+			defer cancel()
+			status, err := haClient.Status(ctx)
+			if err != nil {
+				inst.Status = StatusBroken
+				inst.Errors = append(inst.Errors, fmt.Errorf("failed to get Status from %q: %w", haSock, err))
+			} else {
+				if status.State == hostagentapi.StatePaused {
+					instStatus = StatusPaused
+				}
+				if status.State == hostagentapi.StateRunning {
+					instStatus = StatusRunning
+				}
+			}
+		}
+	}
+
 	if inst.Status == StatusUnknown {
 		switch {
 		case inst.HostAgentPID > 0 && inst.DriverPID > 0:
-			inst.Status = StatusRunning
+			inst.Status = instStatus
 		case inst.HostAgentPID == 0 && inst.DriverPID == 0:
 			inst.Status = StatusStopped
 		case inst.HostAgentPID > 0 && inst.DriverPID == 0:

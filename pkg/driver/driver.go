@@ -8,6 +8,11 @@ import (
 	"github.com/lima-vm/lima/pkg/store"
 )
 
+type BaseStatus struct {
+	Paused  bool
+	Running bool
+}
+
 // Driver interface is used by hostagent for managing vm.
 //
 // This interface is extended by BaseDriver which provides default implementation.
@@ -54,6 +59,13 @@ type Driver interface {
 	ChangeDisplayPassword(_ context.Context, password string) error
 
 	GetDisplayConnection(_ context.Context) (string, error)
+
+	Suspend(_ context.Context) error
+
+	Resume(_ context.Context) error
+
+	// Status returns the current status of the vm instance.
+	Status(_ context.Context) (*BaseStatus, error)
 
 	CreateSnapshot(_ context.Context, tag string) error
 
@@ -122,6 +134,18 @@ func (d *BaseDriver) ChangeDisplayPassword(_ context.Context, _ string) error {
 
 func (d *BaseDriver) GetDisplayConnection(_ context.Context) (string, error) {
 	return "", nil
+}
+
+func (d *BaseDriver) Suspend(_ context.Context) error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (d *BaseDriver) Resume(_ context.Context) error {
+	return fmt.Errorf("unimplemented")
+}
+
+func (d *BaseDriver) Status(_ context.Context) (*BaseStatus, error) {
+	return &BaseStatus{Running: true, Paused: false}, nil
 }
 
 func (d *BaseDriver) CreateSnapshot(_ context.Context, _ string) error {

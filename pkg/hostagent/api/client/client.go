@@ -16,6 +16,7 @@ import (
 type HostAgentClient interface {
 	HTTPClient() *http.Client
 	Info(context.Context) (*api.Info, error)
+	Status(context.Context) (*api.Status, error)
 }
 
 // NewHostAgentClient creates a client.
@@ -61,4 +62,19 @@ func (c *client) Info(ctx context.Context) (*api.Info, error) {
 		return nil, err
 	}
 	return &info, nil
+}
+
+func (c *client) Status(ctx context.Context) (*api.Status, error) {
+	u := fmt.Sprintf("http://%s/%s/status", c.dummyHost, c.version)
+	resp, err := httpclientutil.Get(ctx, c.HTTPClient(), u)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var status api.Status
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&status); err != nil {
+		return nil, err
+	}
+	return &status, nil
 }

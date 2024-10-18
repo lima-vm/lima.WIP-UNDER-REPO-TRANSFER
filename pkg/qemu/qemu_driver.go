@@ -363,6 +363,34 @@ func logPipeRoutine(r io.Reader, header string) {
 	}
 }
 
+func (l *LimaQemuDriver) Suspend(_ context.Context) error {
+	qCfg := Config{
+		Name:        l.Instance.Name,
+		InstanceDir: l.Instance.Dir,
+		LimaYAML:    l.Instance.Config,
+	}
+	return Stop(qCfg)
+}
+
+func (l *LimaQemuDriver) Resume(_ context.Context) error {
+	qCfg := Config{
+		Name:        l.Instance.Name,
+		InstanceDir: l.Instance.Dir,
+		LimaYAML:    l.Instance.Config,
+	}
+	return Cont(qCfg)
+}
+
+func (l *LimaQemuDriver) Status(_ context.Context) (*driver.BaseStatus, error) {
+	qCfg := Config{
+		Name:        l.Instance.Name,
+		InstanceDir: l.Instance.Dir,
+		LimaYAML:    l.Instance.Config,
+	}
+	status, err := QueryStatus(qCfg)
+	return &driver.BaseStatus{Paused: IsPaused(status), Running: IsRunning(status)}, err
+}
+
 func (l *LimaQemuDriver) DeleteSnapshot(_ context.Context, tag string) error {
 	qCfg := Config{
 		Name:        l.Instance.Name,

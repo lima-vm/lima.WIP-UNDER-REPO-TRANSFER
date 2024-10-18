@@ -50,6 +50,28 @@ func (b *Backend) GetInfo(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(m)
 }
 
+// GetStatus is the handler for GET /v{N}/status.
+func (b *Backend) GetStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	status, err := b.Agent.Status(ctx)
+	if err != nil {
+		b.onError(w, err, http.StatusInternalServerError)
+		return
+	}
+	m, err := json.Marshal(status)
+	if err != nil {
+		b.onError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(m)
+}
+
 func AddRoutes(r *http.ServeMux, b *Backend) {
 	r.Handle("/v1/info", http.HandlerFunc(b.GetInfo))
+	r.Handle("/v1/status", http.HandlerFunc(b.GetStatus))
 }

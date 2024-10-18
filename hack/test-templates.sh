@@ -26,6 +26,7 @@ declare -A CHECKS=(
 	["systemd-strict"]="1"
 	["mount-home"]="1"
 	["container-engine"]="1"
+	["pause"]="1"
 	["restart"]="1"
 	# snapshot tests are too flaky (especially with archlinux)
 	["snapshot-online"]=""
@@ -332,6 +333,28 @@ if [[ -n ${CHECKS["disk"]} ]]; then
 		exit 1
 	fi
 	set +x
+fi
+
+if [[ -n ${CHECKS["pause"]} ]]; then
+	INFO "Suspending \"$NAME\""
+	limactl suspend "$NAME"
+
+	got=$(limactl ls --format '{{.Status}}' "$NAME")
+	expected="Paused"
+	if [ "$got" != "$expected" ]; then
+		ERROR "suspend status: expected=${expected} got=${got}"
+		exit 1
+	fi
+
+	INFO "Resuming \"$NAME\""
+	limactl resume "$NAME"
+
+	got=$(limactl ls --format '{{.Status}}' "$NAME")
+	expected="Running"
+	if [ "$got" != "$expected" ]; then
+		ERROR "resume status: expected=${expected} got=${got}"
+		exit 1
+	fi
 fi
 
 if [[ -n ${CHECKS["restart"]} ]]; then

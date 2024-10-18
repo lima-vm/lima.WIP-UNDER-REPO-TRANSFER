@@ -463,6 +463,24 @@ func (a *HostAgent) Info(_ context.Context) (*hostagentapi.Info, error) {
 	return info, nil
 }
 
+func (a *HostAgent) Status(ctx context.Context) (*hostagentapi.Status, error) {
+	driverStatus, err := a.driver.Status(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var state hostagentapi.RunState
+	if driverStatus.Running {
+		state = hostagentapi.StateRunning
+	}
+	if driverStatus.Paused {
+		state = hostagentapi.StatePaused
+	}
+	status := &hostagentapi.Status{
+		State: state,
+	}
+	return status, nil
+}
+
 func (a *HostAgent) startHostAgentRoutines(ctx context.Context) error {
 	if *a.instConfig.Plain {
 		logrus.Info("Running in plain mode. Mounts, port forwarding, containerd, etc. will be ignored. Guest agent will not be running.")
