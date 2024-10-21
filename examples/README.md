@@ -30,6 +30,9 @@ Distro:
 - [`experimental/gentoo`](./experimental/gentoo.yaml): [experimental] Gentoo
 - [`experimental/opensuse-tumbleweed`](./experimental/opensuse-tumbleweed.yaml): [experimental] openSUSE Tumbleweed
 
+Provisioning:
+- [`ansible`](./ansible.yaml): Ansible, using [playbook.yaml](./ansible/playbook.yaml)
+
 Container engines:
 - [`apptainer`](./apptainer.yaml): Apptainer
 - [`apptainer-rootful`](./apptainer-rootful.yaml): Apptainer (rootful)
