@@ -102,6 +102,9 @@ func TestFillDefault(t *testing.T) {
 			Enabled: ptr.Of(true),
 			IPv6:    ptr.Of(false),
 		},
+		HostProxy: HostProxy{
+			Enabled: ptr.Of(false),
+		},
 		PropagateProxyEnv: ptr.Of(true),
 		CACertificates: CACertificates{
 			RemoveDefaults: ptr.Of(false),
@@ -365,6 +368,9 @@ func TestFillDefault(t *testing.T) {
 				"default": "localhost",
 			},
 		},
+		HostProxy: HostProxy{
+			Enabled: ptr.Of(true),
+		},
 		PropagateProxyEnv: ptr.Of(false),
 
 		Mounts: []Mount{
@@ -563,6 +569,9 @@ func TestFillDefault(t *testing.T) {
 			Hosts: map[string]string{
 				"override.": "underflow",
 			},
+		},
+		HostProxy: HostProxy{
+			Enabled: ptr.Of(true),
 		},
 		PropagateProxyEnv: ptr.Of(false),
 

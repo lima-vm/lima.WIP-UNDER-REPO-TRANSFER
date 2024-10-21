@@ -111,7 +111,7 @@ func setupEnv(instConfigEnv map[string]string, propagateProxyEnv bool, slirpGate
 	return env, nil
 }
 
-func templateArgs(bootScripts bool, instDir, name string, instConfig *limayaml.LimaYAML, udpDNSLocalPort, tcpDNSLocalPort, vsockPort int, virtioPort string) (*TemplateArgs, error) {
+func templateArgs(bootScripts bool, instDir, name string, instConfig *limayaml.LimaYAML, udpDNSLocalPort, tcpDNSLocalPort, vsockPort int, virtioPort string, proxyPort int, proxyCert string) (*TemplateArgs, error) {
 	if err := limayaml.Validate(instConfig, false); err != nil {
 		return nil, err
 	}
@@ -290,6 +290,11 @@ func templateArgs(bootScripts bool, instDir, name string, instConfig *limayaml.L
 		}
 	}
 
+	if *instConfig.HostProxy.Enabled {
+		args.HTTPProxyLocalPort = proxyPort
+		args.HTTPProxyCACert = getCert(proxyCert)
+	}
+
 	args.CACerts.RemoveDefaults = instConfig.CACertificates.RemoveDefaults
 
 	for _, path := range instConfig.CACertificates.Files {
@@ -330,7 +335,7 @@ func templateArgs(bootScripts bool, instDir, name string, instConfig *limayaml.L
 }
 
 func GenerateCloudConfig(instDir, name string, instConfig *limayaml.LimaYAML) error {
-	args, err := templateArgs(false, instDir, name, instConfig, 0, 0, 0, "")
+	args, err := templateArgs(false, instDir, name, instConfig, 0, 0, 0, "", 0, "")
 	if err != nil {
 		return err
 	}
@@ -352,8 +357,8 @@ func GenerateCloudConfig(instDir, name string, instConfig *limayaml.LimaYAML) er
 	return os.WriteFile(filepath.Join(instDir, filenames.CloudConfig), config, 0o444)
 }
 
-func GenerateISO9660(instDir, name string, instConfig *limayaml.LimaYAML, udpDNSLocalPort, tcpDNSLocalPort int, nerdctlArchive string, vsockPort int, virtioPort string) error {
-	args, err := templateArgs(true, instDir, name, instConfig, udpDNSLocalPort, tcpDNSLocalPort, vsockPort, virtioPort)
+func GenerateISO9660(instDir, name string, instConfig *limayaml.LimaYAML, udpDNSLocalPort, tcpDNSLocalPort int, nerdctlArchive string, vsockPort int, virtioPort string, proxyPort int, proxyCert string) error {
+	args, err := templateArgs(true, instDir, name, instConfig, udpDNSLocalPort, tcpDNSLocalPort, vsockPort, virtioPort, proxyPort, proxyCert)
 	if err != nil {
 		return err
 	}

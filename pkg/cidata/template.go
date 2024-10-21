@@ -73,6 +73,8 @@ type TemplateArgs struct {
 	SlirpIPAddress                  string
 	UDPDNSLocalPort                 int
 	TCPDNSLocalPort                 int
+	HTTPProxyLocalPort              int
+	HTTPProxyCACert                 Cert
 	Env                             map[string]string
 	Param                           map[string]string
 	BootScripts                     bool

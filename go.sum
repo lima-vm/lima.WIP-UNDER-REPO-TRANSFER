@@ -75,6 +75,10 @@ github.com/elastic/go-libaudit/v2 v2.5.0 h1:5OK919QRnGtcjVBz3n/cs5F42im1mPlVTA9T
 github.com/elastic/go-libaudit/v2 v2.5.0/go.mod h1:AjlnhinP+kKQuUJoXLVrqxBM8uyhQmkzoV6jjsCFP4Q=
 github.com/elastic/go-licenser v0.4.1 h1:1xDURsc8pL5zYT9R29425J3vkHdt4RT5TNEMeRN48x4=
 github.com/elastic/go-licenser v0.4.1/go.mod h1:V56wHMpmdURfibNBggaSBfqgPxyT1Tldns1i87iTEvU=
+github.com/elazarl/goproxy v0.0.0-20240909085733-6741dbfc16a1 h1:g7YUigN4dW2+zpdusdTTghZ+5Py3BaUMAStvL8Nk+FY=
+github.com/elazarl/goproxy v0.0.0-20240909085733-6741dbfc16a1/go.mod h1:thX175TtLTzLj3p7N/Q9IiKZ7NF+p72cvL91emV0hzo=
+github.com/elazarl/goproxy/ext v0.0.0-20190711103511-473e67f1d7d2 h1:dWB6v3RcOy03t/bUadywsbyrQwCqZeNIEX6M1OtSZOM=
+github.com/elazarl/goproxy/ext v0.0.0-20190711103511-473e67f1d7d2/go.mod h1:gNh8nYJoAm43RfaxurUnxr+N1PwuFV3ZMl/efxlIlY8=
 github.com/elliotchance/orderedmap v1.6.0 h1:xjn+kbbKXeDq6v9RVE+WYwRbYfAZKvlWfcJNxM8pvEw=
 github.com/elliotchance/orderedmap v1.6.0/go.mod h1:wsDwEaX5jEoyhbs7x93zk2H/qv0zwuhg4inXhDkYqys=
 github.com/elliotwutingfeng/asciiset v0.0.0-20230602022725-51bbb787efab h1:h1UgjJdAAhj+uPL68n7XASS6bU+07ZX1WJvVS2eyoeY=

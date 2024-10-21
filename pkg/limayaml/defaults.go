@@ -514,6 +514,16 @@ func FillDefault(y, d, o *LimaYAML, filePath string) {
 		y.HostResolver.IPv6 = ptr.Of(false)
 	}
 
+	if y.HostProxy.Enabled == nil {
+		y.HostProxy.Enabled = d.HostProxy.Enabled
+	}
+	if o.HostProxy.Enabled != nil {
+		y.HostProxy.Enabled = o.HostProxy.Enabled
+	}
+	if y.HostProxy.Enabled == nil {
+		y.HostProxy.Enabled = ptr.Of(false)
+	}
+
 	if y.PropagateProxyEnv == nil {
 		y.PropagateProxyEnv = d.PropagateProxyEnv
 	}

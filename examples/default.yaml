@@ -498,6 +498,11 @@ hostResolver:
 # - 1.1.1.1
 # - 1.0.0.1
 
+# The host proxy implements a HTTP and HTTPS proxy that can cache downloads on the host.
+hostProxy:
+  # 🟢 Builtin default: false
+  enabled: null
+
 # Prefix to use for installing guest agent, and containerd with dependencies (if configured)
 # 🟢 Builtin default: /usr/local
 guestInstallPrefix: null
