@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,23 +50,73 @@ var templateCopyExample = `  Template locators are local files, file://, https:/
 
 func newTemplateCopyCommand() *cobra.Command {
 	templateCopyCommand := &cobra.Command{
-		Use:     "copy TEMPLATE DEST",
+		Use:     "copy [OPTIONS] TEMPLATE DEST",
 		Short:   "Copy template",
 		Long:    "Copy a template via locator to a local file",
 		Example: templateCopyExample,
 		Args:    WrapArgsError(cobra.ExactArgs(2)),
 		RunE:    templateCopyAction,
 	}
+	templateCopyCommand.Flags().Bool("embed", false, "embed dependencies into template")
+	templateCopyCommand.Flags().Bool("fill", false, "fill defaults")
+	templateCopyCommand.Flags().Bool("verbatim", false, "don't make locators absolute")
 	return templateCopyCommand
 }
 
 func templateCopyAction(cmd *cobra.Command, args []string) error {
+	embed, err := cmd.Flags().GetBool("embed")
+	if err != nil {
+		return err
+	}
+	fill, err := cmd.Flags().GetBool("fill")
+	if err != nil {
+		return err
+	}
+	verbatim, err := cmd.Flags().GetBool("verbatim")
+	if err != nil {
+		return err
+	}
+	if embed && verbatim {
+		return errors.New("--embed and --verbatim cannot be used together")
+	}
+	if fill && verbatim {
+		return errors.New("--fill and --verbatim cannot be used together")
+	}
+
 	tmpl, err := limatmpl.Read(cmd.Context(), "", args[0])
 	if err != nil {
 		return err
 	}
 	if len(tmpl.Bytes) == 0 {
 		return fmt.Errorf("don't know how to interpret %q as a template locator", args[0])
+	}
+	if !verbatim {
+		if embed {
+			if err := tmpl.Embed(cmd.Context()); err != nil {
+				return err
+			}
+		} else {
+			if err := tmpl.UseAbsLocators(); err != nil {
+				return err
+			}
+		}
+	}
+	if fill {
+		limaDir, err := dirnames.LimaDir()
+		if err != nil {
+			return err
+		}
+		// Load() will merge the template with override.yaml and default.yaml via FillDefaults().
+		// FillDefaults() needs the potential instance directory to validate host templates using {{.Dir}}.
+		filePath := filepath.Join(limaDir, tmpl.Name+".yaml")
+		tmpl.Config, err = limayaml.Load(tmpl.Bytes, filePath)
+		if err != nil {
+			return err
+		}
+		tmpl.Bytes, err = limayaml.Marshal(tmpl.Config, false)
+		if err != nil {
+			return err
+		}
 	}
 	writer := cmd.OutOrStdout()
 	target := args[1]
@@ -115,8 +166,8 @@ func templateValidateAction(cmd *cobra.Command, args []string) error {
 		}
 		// Load() will merge the template with override.yaml and default.yaml via FillDefaults().
 		// FillDefaults() needs the potential instance directory to validate host templates using {{.Dir}}.
-		instDir := filepath.Join(limaDir, tmpl.Name)
-		y, err := limayaml.Load(tmpl.Bytes, instDir)
+		filePath := filepath.Join(limaDir, tmpl.Name+".yaml")
+		y, err := limayaml.Load(tmpl.Bytes, filePath)
 		if err != nil {
 			return err
 		}

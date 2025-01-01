@@ -196,7 +196,9 @@ func loadOrCreateInstance(cmd *cobra.Command, args []string, createOnly bool) (*
 			return nil, err
 		}
 	}
-
+	if err := tmpl.Embed(cmd.Context()); err != nil {
+		return nil, err
+	}
 	yqExprs, err := editflags.YQExpressions(flags, true)
 	if err != nil {
 		return nil, err

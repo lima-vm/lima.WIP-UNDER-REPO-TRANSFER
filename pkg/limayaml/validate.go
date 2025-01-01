@@ -46,6 +46,9 @@ func validateFileObject(f File, fieldName string) error {
 }
 
 func Validate(y *LimaYAML, warn bool) error {
+	if len(y.BasedOn) > 0 {
+		return errors.New("field `basedOn` must be empty for YAML validation")
+	}
 	if y.MinimumLimaVersion != nil {
 		if _, err := versionutil.Parse(*y.MinimumLimaVersion); err != nil {
 			return fmt.Errorf("field `minimumLimaVersion` must be a semvar value, got %q: %w", *y.MinimumLimaVersion, err)
@@ -196,6 +199,9 @@ func Validate(y *LimaYAML, warn bool) error {
 	// y.Firmware.LegacyBIOS is ignored for aarch64, but not a fatal error.
 
 	for i, p := range y.Provision {
+		if p.File != nil && *p.File != "" {
+			return fmt.Errorf("field `provision[%d].file` must be empty during validation (script should already be embedded)", i)
+		}
 		switch p.Mode {
 		case ProvisionModeSystem, ProvisionModeUser, ProvisionModeBoot:
 			if p.SkipDefaultDependencyResolution != nil {
@@ -236,6 +242,9 @@ func Validate(y *LimaYAML, warn bool) error {
 		}
 	}
 	for i, p := range y.Probes {
+		if p.File != nil && *p.File != "" {
+			return fmt.Errorf("field `probes[%d].file` must be empty during validation (script should already be embedded)", i)
+		}
 		if !strings.HasPrefix(p.Script, "#!") {
 			return fmt.Errorf("field `probe[%d].script` must start with a '#!' line", i)
 		}

@@ -7,6 +7,7 @@ import (
 )
 
 type LimaYAML struct {
+	BasedOn               BaseTemplates `yaml:"basedOn,omitempty" json:"basedOn,omitempty" jsonschema:"nullable"`
 	MinimumLimaVersion    *string       `yaml:"minimumLimaVersion,omitempty" json:"minimumLimaVersion,omitempty" jsonschema:"nullable"`
 	VMType                *VMType       `yaml:"vmType,omitempty" json:"vmType,omitempty" jsonschema:"nullable"`
 	VMOpts                VMOpts        `yaml:"vmOpts,omitempty" json:"vmOpts,omitempty"`
@@ -49,6 +50,8 @@ type LimaYAML struct {
 	NestedVirtualization *bool          `yaml:"nestedVirtualization,omitempty" json:"nestedVirtualization,omitempty" jsonschema:"nullable"`
 	User                 User           `yaml:"user,omitempty" json:"user,omitempty"`
 }
+
+type BaseTemplates []string
 
 type (
 	OS        = string
@@ -215,6 +218,7 @@ type Provision struct {
 	Mode                            ProvisionMode `yaml:"mode,omitempty" json:"mode,omitempty" jsonschema:"default=system"`
 	SkipDefaultDependencyResolution *bool         `yaml:"skipDefaultDependencyResolution,omitempty" json:"skipDefaultDependencyResolution,omitempty"`
 	Script                          string        `yaml:"script" json:"script"`
+	File                            *string       `yaml:"file,omitempty" json:"file,omitempty" jsonschema:"nullable"`
 	Playbook                        string        `yaml:"playbook,omitempty" json:"playbook,omitempty"`
 }
 
@@ -234,6 +238,7 @@ type Probe struct {
 	Mode        ProbeMode `yaml:"mode,omitempty" json:"mode,omitempty" jsonschema:"default=readiness"`
 	Description string    `yaml:"description,omitempty" json:"description,omitempty"`
 	Script      string    `yaml:"script,omitempty" json:"script,omitempty"`
+	File        *string   `yaml:"file,omitempty" json:"file,omitempty" jsonschema:"nullable"`
 	Hint        string    `yaml:"hint,omitempty" json:"hint,omitempty"`
 }
 
