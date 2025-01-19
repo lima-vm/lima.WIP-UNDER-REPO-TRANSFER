@@ -167,6 +167,7 @@ func shellAction(cmd *cobra.Command, args []string) error {
 	}
 
 	sshOpts, err := sshutil.SSHOpts(
+		arg0,
 		inst.Dir,
 		*inst.Config.User.Name,
 		*inst.Config.SSH.LoadDotSSHPubKeys,
@@ -188,7 +189,7 @@ func shellAction(cmd *cobra.Command, args []string) error {
 	logLevel := "ERROR"
 	// For versions older than OpenSSH 8.9p, LogLevel=QUIET was needed to
 	// avoid the "Shared connection to 127.0.0.1 closed." message with -t.
-	olderSSH := sshutil.DetectOpenSSHVersion().LessThan(*semver.New("8.9.0"))
+	olderSSH := sshutil.DetectOpenSSHVersion(arg0).LessThan(*semver.New("8.9.0"))
 	if olderSSH {
 		logLevel = "QUIET"
 	}

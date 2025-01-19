@@ -127,7 +127,7 @@ var sshInfo struct {
 //
 // The result always contains the IdentityFile option.
 // The result never contains the Port option.
-func CommonOpts(useDotSSH bool) ([]string, error) {
+func CommonOpts(sshPath string, useDotSSH bool) ([]string, error) {
 	configDir, err := dirnames.LimaConfigDir()
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func CommonOpts(useDotSSH bool) ([]string, error) {
 
 	sshInfo.Do(func() {
 		sshInfo.aesAccelerated = detectAESAcceleration()
-		sshInfo.openSSHVersion = DetectOpenSSHVersion()
+		sshInfo.openSSHVersion = DetectOpenSSHVersion(sshPath)
 	})
 
 	// Only OpenSSH version 8.1 and later support adding ciphers to the front of the default set
@@ -224,12 +224,12 @@ func CommonOpts(useDotSSH bool) ([]string, error) {
 }
 
 // SSHOpts adds the following options to CommonOptions: User, ControlMaster, ControlPath, ControlPersist.
-func SSHOpts(instDir, username string, useDotSSH, forwardAgent, forwardX11, forwardX11Trusted bool) ([]string, error) {
+func SSHOpts(sshPath, instDir, username string, useDotSSH, forwardAgent, forwardX11, forwardX11Trusted bool) ([]string, error) {
 	controlSock := filepath.Join(instDir, filenames.SSHSock)
 	if len(controlSock) >= osutil.UnixPathMax {
 		return nil, fmt.Errorf("socket path %q is too long: >= UNIX_PATH_MAX=%d", controlSock, osutil.UnixPathMax)
 	}
-	opts, err := CommonOpts(useDotSSH)
+	opts, err := CommonOpts(sshPath, useDotSSH)
 	if err != nil {
 		return nil, err
 	}
@@ -288,13 +288,13 @@ type sshExecutable struct {
 // sshVersion caches the parsed version of each ssh executable, if it is needed again.
 var sshVersions = map[sshExecutable]*semver.Version{}
 
-func DetectOpenSSHVersion() semver.Version {
+func DetectOpenSSHVersion(ssh string) semver.Version {
 	var (
 		v      semver.Version
 		exe    sshExecutable
 		stderr bytes.Buffer
 	)
-	path, err := exec.LookPath("ssh")
+	path, err := exec.LookPath(ssh)
 	if err != nil {
 		logrus.Warnf("failed to find ssh executable: %v", err)
 	} else {

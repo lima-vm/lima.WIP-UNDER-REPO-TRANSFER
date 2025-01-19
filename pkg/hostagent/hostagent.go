@@ -143,6 +143,7 @@ func New(instName string, stdout io.Writer, signalCh chan os.Signal, opts ...Opt
 	}
 
 	sshOpts, err := sshutil.SSHOpts(
+		"ssh",
 		inst.Dir,
 		*inst.Config.User.Name,
 		*inst.Config.SSH.LoadDotSSHPubKeys,
@@ -152,7 +153,7 @@ func New(instName string, stdout io.Writer, signalCh chan os.Signal, opts ...Opt
 	if err != nil {
 		return nil, err
 	}
-	if err = writeSSHConfigFile(inst.Name, inst.Dir, inst.SSHAddress, sshLocalPort, sshOpts); err != nil {
+	if err = writeSSHConfigFile("ssh", inst.Name, inst.Dir, inst.SSHAddress, sshLocalPort, sshOpts); err != nil {
 		return nil, err
 	}
 	sshConfig := &ssh.SSHConfig{
@@ -220,7 +221,7 @@ func New(instName string, stdout io.Writer, signalCh chan os.Signal, opts ...Opt
 	return a, nil
 }
 
-func writeSSHConfigFile(instName, instDir, instSSHAddress string, sshLocalPort int, sshOpts []string) error {
+func writeSSHConfigFile(sshPath, instName, instDir, instSSHAddress string, sshLocalPort int, sshOpts []string) error {
 	if instDir == "" {
 		return fmt.Errorf("directory is unknown for the instance %q", instName)
 	}
@@ -231,7 +232,7 @@ func writeSSHConfigFile(instName, instDir, instSSHAddress string, sshLocalPort i
 `); err != nil {
 		return err
 	}
-	if err := sshutil.Format(&b, instName, sshutil.FormatConfig,
+	if err := sshutil.Format(&b, sshPath, instName, sshutil.FormatConfig,
 		append(sshOpts,
 			fmt.Sprintf("Hostname=%s", instSSHAddress),
 			fmt.Sprintf("Port=%d", sshLocalPort),

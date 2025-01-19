@@ -89,6 +89,7 @@ func showSSHAction(cmd *cobra.Command, args []string) error {
 	logrus.Warnf("`limactl show-ssh` is deprecated. Instead, use `ssh -F %s %s`.",
 		filepath.Join(inst.Dir, filenames.SSHConfig), inst.Hostname)
 	opts, err := sshutil.SSHOpts(
+		"ssh",
 		inst.Dir,
 		*inst.Config.User.Name,
 		*inst.Config.SSH.LoadDotSSHPubKeys,
@@ -100,7 +101,7 @@ func showSSHAction(cmd *cobra.Command, args []string) error {
 	}
 	opts = append(opts, "Hostname=127.0.0.1")
 	opts = append(opts, fmt.Sprintf("Port=%d", inst.SSHLocalPort))
-	return sshutil.Format(w, instName, format, opts)
+	return sshutil.Format(w, "ssh", instName, format, opts)
 }
 
 func showSSHBashComplete(cmd *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
