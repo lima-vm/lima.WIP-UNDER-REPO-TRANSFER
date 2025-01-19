@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/lima-vm/lima/pkg/ioutilx"
@@ -277,18 +278,40 @@ func ParseOpenSSHVersion(version []byte) *semver.Version {
 	return &semver.Version{}
 }
 
+// sshExecutable beyond path also records size and mtime, in the case of ssh upgrades.
+type sshExecutable struct {
+	Path    string
+	Size    int64
+	ModTime time.Time
+}
+
+// sshVersion caches the parsed version of each ssh executable, if it is needed again.
+var sshVersions = map[sshExecutable]*semver.Version{}
+
 func DetectOpenSSHVersion() semver.Version {
 	var (
 		v      semver.Version
+		exe    sshExecutable
 		stderr bytes.Buffer
 	)
-	cmd := exec.Command("ssh", "-V")
+	path, err := exec.LookPath("ssh")
+	if err != nil {
+		logrus.Warnf("failed to find ssh executable: %v", err)
+	} else {
+		st, _ := os.Stat(path)
+		exe = sshExecutable{Path: path, Size: st.Size(), ModTime: st.ModTime()}
+		if ver := sshVersions[exe]; ver != nil {
+			return *ver
+		}
+	}
+	cmd := exec.Command(path, "-V")
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		logrus.Warnf("failed to run %v: stderr=%q", cmd.Args, stderr.String())
 	} else {
 		v = *ParseOpenSSHVersion(stderr.Bytes())
 		logrus.Debugf("OpenSSH version %s detected", v)
+		sshVersions[exe] = &v
 	}
 	return v
 }
