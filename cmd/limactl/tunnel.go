@@ -11,7 +11,6 @@ import (
 	"github.com/lima-vm/lima/pkg/freeport"
 	"github.com/lima-vm/lima/pkg/sshutil"
 	"github.com/lima-vm/lima/pkg/store"
-	"github.com/mattn/go-shellwords"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -79,30 +78,9 @@ func tunnelAction(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	var (
-		arg0     string
-		arg0Args []string
-	)
-	// FIXME: deduplicate the code clone across `limactl shell` and `limactl tunnel`
-	if sshShell := os.Getenv(envShellSSH); sshShell != "" {
-		sshShellFields, err := shellwords.Parse(sshShell)
-		switch {
-		case err != nil:
-			logrus.WithError(err).Warnf("Failed to split %s variable into shell tokens. "+
-				"Falling back to 'ssh' command", envShellSSH)
-		case len(sshShellFields) > 0:
-			arg0 = sshShellFields[0]
-			if len(sshShellFields) > 1 {
-				arg0Args = sshShellFields[1:]
-			}
-		}
-	}
-
-	if arg0 == "" {
-		arg0, err = exec.LookPath("ssh")
-		if err != nil {
-			return err
-		}
+	arg0, arg0Args, err := sshutil.GetSSHArguments()
+	if err != nil {
+		return err
 	}
 
 	sshOpts, err := sshutil.SSHOpts(
