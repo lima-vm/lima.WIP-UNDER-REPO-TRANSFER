@@ -21,9 +21,39 @@ import (
 	"github.com/lima-vm/lima/pkg/osutil"
 	"github.com/lima-vm/lima/pkg/store/dirnames"
 	"github.com/lima-vm/lima/pkg/store/filenames"
+	"github.com/mattn/go-shellwords"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/cpu"
 )
+
+// Environment variable that allows configuring the command (alias) to execute
+// in place of the 'ssh' executable.
+const EnvShellSSH = "SSH"
+
+func GetSSHArguments() (arg0 string, arg0Args []string, err error) {
+	if sshShell := os.Getenv(EnvShellSSH); sshShell != "" {
+		sshShellFields, err := shellwords.Parse(sshShell)
+		switch {
+		case err != nil:
+			logrus.WithError(err).Warnf("Failed to split %s variable into shell tokens. "+
+				"Falling back to 'ssh' command", EnvShellSSH)
+		case len(sshShellFields) > 0:
+			arg0 = sshShellFields[0]
+			if len(sshShellFields) > 1 {
+				arg0Args = sshShellFields[1:]
+			}
+		}
+	}
+
+	if arg0 == "" {
+		arg0, err = exec.LookPath("ssh")
+		if err != nil {
+			return "", []string{""}, err
+		}
+	}
+
+	return arg0, arg0Args, nil
+}
 
 type PubKey struct {
 	Filename string
