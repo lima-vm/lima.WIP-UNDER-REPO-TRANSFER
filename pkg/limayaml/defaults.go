@@ -73,6 +73,10 @@ func defaultCPUType() CPUType {
 		if arch == X8664 && runtime.GOOS == "darwin" {
 			switch cpuType[arch] {
 			case "host", "max":
+				// disable AVX-512, since it requires trapping instruction faults in guest
+				// Enterprise Linux requires either v2 (SSE4) or v3 (AVX2), but not yet v4.
+				cpuType[arch] += ",-avx512vl"
+
 				// Disable pdpe1gb on Intel Mac
 				// https://github.com/lima-vm/lima/issues/1485
 				// https://stackoverflow.com/a/72863744/5167443
