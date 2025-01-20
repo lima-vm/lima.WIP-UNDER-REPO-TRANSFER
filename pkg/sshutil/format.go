@@ -58,11 +58,11 @@ func quoteOption(o string) string {
 }
 
 // Format formats the ssh options.
-func Format(w io.Writer, instName string, format FormatT, opts []string) error {
+func Format(w io.Writer, sshPath, instName string, format FormatT, opts []string) error {
 	fakeHostname := identifierutil.HostnameFromInstName(instName) // TODO: support customization
 	switch format {
 	case FormatCmd:
-		args := []string{"ssh"}
+		args := []string{sshPath}
 		for _, o := range opts {
 			args = append(args, "-o", quoteOption(o))
 		}
