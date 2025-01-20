@@ -1,0 +1,100 @@
+#!/bin/bash
+
+set -e
+set -o pipefail
+
+hostname=$(hostname)
+
+case ${hostname} in
+	lima-*)
+		# already in lima
+		;;
+	*)
+		exec lima "$0" "$@"
+		;;
+esac
+
+machine=$(uname -m)
+
+case ${machine} in
+	aarch64)
+		PLATFORM=linux/arm64
+		;;
+	armv7l)
+		PLATFORM=linux/arm/v7
+		;;
+	riscv64)
+		PLATFORM=linux/riscv64
+		;;
+	x86_64)
+		PLATFORM=linux/amd64
+		;;
+	*)
+		echo "Warning: Unknown machine type ${machine}" >&2
+		exit 1
+		;;
+esac
+
+TOOLBOX_DOCKER_IMAGE=fedora
+TOOLBOX_DOCKER_TAG=latest
+TOOLBOX_USER=root
+TOOLBOX_BIND="--volume=/:/media/root --volume=/usr:/media/root/usr --volume=/run:/media/root/run"
+TOOLBOX_FLAGS=""
+# Ex: "--env=KEY=VALUE"
+TOOLBOX_ENV=""
+
+toolboxrc="${HOME}"/.toolboxrc
+
+# System defaults
+if [ -f "/etc/default/toolbox" ]; then
+	# shellcheck disable=SC1091
+	source "/etc/default/toolbox"
+fi
+
+# User overrides
+if [ -f "${toolboxrc}" ]; then
+	# shellcheck disable=SC1090
+	source "${toolboxrc}"
+fi
+
+if [[ -n "${TOOLBOX_DOCKER_IMAGE}" ]] && [[ -n "${TOOLBOX_DOCKER_TAG}" ]]; then
+	TOOLBOX_NAME=${TOOLBOX_DOCKER_IMAGE}-${TOOLBOX_DOCKER_TAG}
+	have_docker_image="y"
+fi
+
+machinename=$(echo "${USER}-${TOOLBOX_NAME}" | sed -r 's/[^a-zA-Z0-9_.-]/_/g')
+machineimage="${TOOLBOX_IMAGE:-${TOOLBOX_DOCKER_IMAGE}:${TOOLBOX_DOCKER_TAG}}"
+if ! nerdctl image inspect "${machineimage}" >/dev/null; then
+	if [[ -n "${have_docker_image}" ]]; then
+		nerdctl pull "${TOOLBOX_DOCKER_IMAGE}:${TOOLBOX_DOCKER_TAG}"
+	elif [[ -n "${TOOLBOX_DOCKER_ARCHIVE}" ]]; then
+		curl "${TOOLBOX_DOCKER_ARCHIVE}" | zstd -cd | nerdctl load
+	else
+		echo "Error: No toolbox image specified." >&2
+		exit 1
+	fi
+fi
+
+# Special case for when SSH tries to pass a shell command with -c
+if [ "x${1-}" == x-c ]; then
+	set /bin/sh "$@"
+fi
+
+printf "\033[0;90m\u2591 Entering container %s on %s.\033[0m\n" "${machinename}" "${machineimage}"
+
+# If the container already exists, we need to exec rather than run
+if nerdctl container inspect "${machinename}" >/dev/null 2>&1; then
+	nerdctl start "${machinename}" >/dev/null 2>&1 || true
+	exec nerdctl exec -it "${machinename}" "${@-/bin/bash}"
+fi
+
+# shellcheck disable=SC2086
+nerdctl run --platform ${PLATFORM} --interactive --tty \
+	--name="${machinename}" \
+	--hostname="${hostname}" \
+	--ipc host --network host --pid host \
+	--privileged \
+        ${TOOLBOX_FLAGS} \
+        ${TOOLBOX_BIND} \
+        ${TOOLBOX_ENV} \
+	--user="${TOOLBOX_USER}" "${machineimage}" "$@"

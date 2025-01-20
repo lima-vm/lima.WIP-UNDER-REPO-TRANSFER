@@ -241,7 +241,7 @@ LIMA_CMDS = $(sort lima lima$(bat)) # $(sort ...) deduplicates the list
 LIMA_DEPS = $(addprefix _output/bin/,$(LIMA_CMDS))
 lima: $(LIMA_DEPS)
 
-HELPER_CMDS = nerdctl.lima apptainer.lima docker.lima podman.lima kubectl.lima
+HELPER_CMDS = nerdctl.lima apptainer.lima docker.lima podman.lima kubectl.lima toolbox.lima
 HELPERS_DEPS = $(addprefix _output/bin/,$(HELPER_CMDS))
 helpers: $(HELPERS_DEPS)
 
@@ -435,6 +435,7 @@ uninstall:
 		"$(DEST)/bin/docker.lima" \
 		"$(DEST)/bin/podman.lima" \
 		"$(DEST)/bin/kubectl.lima" \
+		"$(DEST)/bin/toolbox.lima" \
 		"$(DEST)/share/man/man1/lima.1" \
 		"$(DEST)/share/man/man1/limactl"*".1" \
 		"$(DEST)/share/lima" "$(DEST)/share/doc/lima"
